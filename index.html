@@ -1,0 +1,1958 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>論理回路シミュレータ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", "Meiryo", sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #f0f2f5; }
+  #toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #2c3e50; color: #fff; flex-wrap: wrap; }
+  #toolbar h1 { font-size: 16px; margin-right: 12px; }
+  #toolbar button { padding: 6px 12px; border: none; border-radius: 4px; background: #3498db; color: #fff; cursor: pointer; display: flex; align-items: center; }
+  #toolbar button svg { display: block; }
+  #toolbar button:hover { background: #5dade2; }
+  #toolbar button.warn { background: #e74c3c; }
+  #toolbar button.warn:hover { background: #ec7063; }
+  #toolbar button.green { background: #27ae60; }
+  #toolbar button.green:hover { background: #2ecc71; }
+  #main { display: flex; flex: 1; overflow: hidden; }
+  #palette { width: 120px; background: #34495e; padding: 10px 8px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+  #palette .ptitle { color: #bdc3c7; font-size: 11px; margin-top: 4px; }
+  #palette .part { background: #ecf0f1; border-radius: 6px; padding: 4px 2px; text-align: center; cursor: pointer; user-select: none; border: 2px solid transparent; }
+  #palette .part svg { display: block; width: 100%; height: 46px; pointer-events: none; }
+  #palette .part:hover { background: #d6eaf8; }
+  #palette .part.active { border-color: #f39c12; background: #fdebd0; }
+  #canvasWrap { flex: 1; overflow: auto; background: #fff; }
+  canvas { display: block; cursor: default; }
+  #status { padding: 6px 12px; background: #2c3e50; color: #ecf0f1; font-size: 12px; min-height: 28px; }
+  #helpPanel { display: none; position: absolute; top: 60px; right: 20px; width: 340px; background: #fffef7; border: 2px solid #f39c12; border-radius: 8px; padding: 14px 16px; font-size: 13px; line-height: 1.7; z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+  #helpPanel h2 { font-size: 14px; margin-bottom: 6px; color: #d35400; }
+  #fileInput { display: none; }
+  #truthPanel { position: fixed; right: 18px; top: 64px; width: auto; min-width: 240px; max-width: 46vw; max-height: 74vh; display: flex; flex-direction: column;
+    background: #fff; border: 2px solid #2c3e50; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 15; font-size: 13px; }
+  #truthPanel[hidden] { display: none; }
+  #truthPanel .tpHead { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #2c3e50; color: #fff; cursor: move; border-radius: 6px 6px 0 0; user-select: none; }
+  #truthPanel .tpHead .sp { flex: 1; }
+  #truthPanel .tpHead button { background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; line-height: 1; }
+  #truthBody { overflow: auto; padding: 8px 10px 10px; }
+  #truthBody .note { color: #566573; line-height: 1.6; margin-bottom: 6px; }
+  #truthBody table { border-collapse: collapse; font-family: Consolas, "Courier New", monospace; }
+  #truthBody th, #truthBody td { border: 1px solid #d5dbdb; padding: 2px 8px; text-align: center; white-space: nowrap; }
+  #truthBody th { background: #eef2f5; position: sticky; top: 0; font-family: "Segoe UI", "Meiryo", sans-serif; font-size: 12px; }
+  #truthBody th.in { color: #1e8449; } #truthBody th.out { color: #a04000; } #truthBody th.mid { color: #1f618d; }
+  #truthBody th small { font-weight: normal; color: #7f8c8d; font-size: 10px; }
+  #truthBody td.mid { background: #f2f8fc; }
+  #truthBody .clearMid { margin-left: 6px; font-size: 11px; color: #1f618d; cursor: pointer; text-decoration: underline; }
+  #truthBody td.sep, #truthBody th.sep { border-left: 3px solid #2c3e50; }
+  #truthBody td.one { color: #c0392b; font-weight: bold; }
+  #truthBody td.zero { color: #95a5a6; }
+  #truthBody td small { color: #7f8c8d; }
+  #truthBody tbody tr { cursor: pointer; }
+  #truthBody tbody tr:hover td { background: #f4f6f7; }
+  #truthBody tbody tr.now td { background: #fdebd0; }
+  #toolbar button:disabled { opacity: .35; cursor: default; }
+  #toolbar button .lbl { margin-left: 4px; font-size: 13px; }
+  #toolbar button:disabled:hover { background: #3498db; }
+  #toolbar .zoom { display: flex; gap: 2px; }
+  #toolbar .zoom button { padding: 6px 9px; font-size: 14px; font-weight: bold; background: #5d6d7e; border-radius: 0; }
+  #toolbar .zoom button:first-child { border-radius: 4px 0 0 4px; }
+  #toolbar .zoom button:last-child { border-radius: 0 4px 4px 0; font-size: 13px; }
+  #toolbar .zoom button:hover { background: #85929e; }
+  #btnZoom100 { min-width: 54px; justify-content: center; font-size: 13px !important; }
+  /* ---- 授業モード ---- */
+  #toolbar button.class { background: #8e44ad; gap: 6px; font-size: 13px; }
+  #toolbar button.class:hover { background: #a569bd; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #bdc3c7; }
+  .dot.済 { background: #2ecc71; } .dot.送信 { background: #f1c40f; } .dot.失敗 { background: #e74c3c; } .dot.待ち { background: #ecf0f1; }
+  #classDialog, #tpBig { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 30; }
+  #tpBig[hidden] { display: none; }
+  #classDialog .box { background: #fff; border-radius: 10px; padding: 18px 22px; width: 360px; font-size: 14px; line-height: 1.6; }
+  #classDialog h2 { font-size: 17px; color: #8e44ad; margin-bottom: 6px; }
+  #classDialog label { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  #classDialog input, #classDialog select { flex: 1; padding: 5px 7px; font-size: 14px; border: 1px solid #bdc3c7; border-radius: 4px; }
+  #classDialog .row { display: flex; gap: 8px; margin-top: 12px; }
+  #classDialog button, #teacherPanel button, #tpBack { padding: 6px 12px; border: none; border-radius: 4px; background: #3498db; color: #fff; cursor: pointer; font-size: 13px; }
+  #classDialog button.green, #teacherPanel button.green { background: #27ae60; }
+  #classDialog button.warn { background: #e74c3c; }
+  #classDialog .msg { color: #c0392b; min-height: 1.4em; margin-top: 6px; }
+  #teacherPanel { position: fixed; inset: 0; background: #f0f2f5; z-index: 20; overflow: auto; font-size: 13px; }
+  #teacherPanel[hidden] { display: none; }
+  #teacherPanel .tbar { position: sticky; top: 0; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 16px; background: #2c3e50; color: #fff; z-index: 2; }
+  #teacherPanel .tbar h2 { font-size: 16px; margin-right: 6px; }
+  #teacherPanel .tbar select { padding: 3px 6px; }
+  #tpTime.err { color: #f5b7b1; }
+  #tpGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; padding: 14px 16px; }
+  #tpGrid .card { background: #fff; border-radius: 8px; padding: 8px 10px; border: 3px solid #d5dbdb; cursor: pointer; }
+  #tpGrid .card.ok { border-color: #27ae60; } #tpGrid .card.part { border-color: #f39c12; }
+  #tpGrid .card canvas { width: 100%; height: auto; display: block; border: 1px solid #eaeded; border-radius: 4px; }
+  #tpGrid .who { display: flex; justify-content: space-between; font-size: 15px; }
+  #tpGrid .mark { font-weight: bold; font-size: 18px; } .ok .mark { color: #27ae60; } .part .mark { color: #e67e22; } .none .mark { color: #95a5a6; }
+  #tpGrid .kadai { color: #7f8c8d; font-size: 11px; margin-bottom: 4px; }
+  #tpGrid .foot { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #566573; margin-top: 4px; }
+  #tpGrid .empty { color: #7f8c8d; font-size: 15px; padding: 30px; }
+  #tpBig .box { background: #fff; border-radius: 10px; padding: 12px; max-width: 96vw; }
+  #tpBig .head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 15px; }
+  #tpBig .sp { flex: 1; }
+  #tpBig canvas { max-width: 92vw; max-height: 78vh; border: 1px solid #eaeded; }
+  #tpBack { position: fixed; right: 18px; bottom: 44px; z-index: 25; background: #8e44ad; font-size: 15px; padding: 10px 16px; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+  #tpBack[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <h1>論理回路シミュレータ</h1>
+  <button id="btnSave" class="green" title="保存 (Ctrl+S) — テキストファイルに保存">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2" fill="none" stroke-linejoin="round"><path d="M5 3 h11 l4 4 v14 H5 z"/><rect x="8" y="14" width="8" height="7"/><path d="M8 3 v5 h7 V3"/></svg>
+  </button>
+  <button id="btnLoad" class="green" title="読み込み — 保存したファイルから続きを再開">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2" fill="none" stroke-linejoin="round"><path d="M3 6 h6 l2 2 h10 v12 H3 z"/><path d="M12 17 v-6"/><path d="M9.5 13.5 L12 11 l2.5 2.5"/></svg>
+  </button>
+  <button id="btnCopy" title="コピー配置 (Ctrl+C) — 囲んで選択した部分を複製">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2" fill="none" stroke-linejoin="round"><rect x="4" y="4" width="12" height="12" rx="2"/><path d="M9 20 h11 V9"/></svg>
+  </button>
+  <button id="btnDelete" class="warn" title="削除 (Del) — 選択した部品・配線を削除">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2" fill="none" stroke-linejoin="round"><path d="M4 7 h16"/><path d="M9 7 V4 h6 v3"/><path d="M6 7 l1 14 h10 l1 -14"/><path d="M10 11 v6 M14 11 v6"/></svg>
+  </button>
+  <button id="btnClear" class="warn" title="全消去 — すべての部品と配線を消す">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2" fill="none" stroke-linejoin="round"><rect x="7" y="7" width="10" height="8" rx="1" transform="rotate(-45 12 11)"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+  </button>
+  <button id="btnUndo" title="元に戻す (Ctrl+Z) — ひとつ前の形にもどす">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 L4 9 L9 4"/><path d="M4 9 h10 a6 6 0 0 1 0 12 h-3"/></svg><span class="lbl">戻す</span>
+  </button>
+  <button id="btnRedo" title="進む (Ctrl+Y) — 元に戻したのをやり直す">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14 L20 9 L15 4"/><path d="M20 9 h-10 a6 6 0 0 0 0 12 h3"/></svg><span class="lbl">進む</span>
+  </button>
+  <button id="btnTruth" title="真理値表 — 入力の全部の組み合わせと出力を表にする">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2" fill="none" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9 h18 M9 4 v16 M15 4 v16"/></svg><span class="lbl">真理値表</span>
+  </button>
+  <button id="btnColor" title="線の色 — 0/1 の色（赤・灰）と、線ごとの色を切りかえる">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke-width="2.6" stroke-linecap="round"><path d="M3 6 h7 v6 h11" stroke="#5dade2"/><path d="M3 12 h4 v6 h14" stroke="#58d68d"/><path d="M3 18 h2 M13 6 h8" stroke="#f5b041"/></svg>
+  </button>
+  <span class="zoom">
+    <button id="btnZoomOut" title="小さく — 回路の絵を小さくする（Ctrl＋ホイールでも）">－</button>
+    <button id="btnZoom100" title="いまの大きさ。押すと 100% にもどす">100%</button>
+    <button id="btnZoomIn" title="大きく — 回路の絵を大きくする（Ctrl＋ホイールでも）">＋</button>
+    <button id="btnZoomFit" title="全体 — 置いた回路が全部見える大きさにする">全体</button>
+  </span>
+  <button id="btnHelp" title="使い方">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" stroke-width="2" fill="none"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5 a2.5 2.5 0 1 1 3.5 2.3 c-.8.4-1 .9-1 1.7"/><circle cx="12" cy="17" r="0.8" fill="#fff"/></svg>
+  </button>
+  <input type="file" id="fileInput" accept=".txt,.json">
+</div>
+<div id="main">
+  <div id="palette">
+    <div class="ptitle">入出力</div>
+    <div class="part" data-type="IN" title="入力スイッチ (クリックで0/1切り替え)">
+      <svg viewBox="0 0 90 48"><rect x="10" y="12" width="40" height="24" rx="12" fill="#2ecc71" stroke="#2c3e50" stroke-width="2"/><circle cx="40" cy="24" r="9" fill="#fff" stroke="#2c3e50" stroke-width="2"/><line x1="50" y1="24" x2="76" y2="24" stroke="#2c3e50" stroke-width="2"/><circle cx="80" cy="24" r="4" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/></svg>
+    </div>
+    <div class="part" data-type="OUT" title="出力ランプ (1で点灯)">
+      <svg viewBox="0 0 90 48"><circle cx="10" cy="24" r="4" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/><line x1="14" y1="24" x2="36" y2="24" stroke="#2c3e50" stroke-width="2"/><circle cx="54" cy="24" r="14" fill="#f1c40f" stroke="#2c3e50" stroke-width="2"/><g stroke="#e67e22" stroke-width="2"><line x1="54" y1="3" x2="54" y2="8"/><line x1="54" y1="40" x2="54" y2="45"/><line x1="70" y1="12" x2="74" y2="8"/><line x1="70" y1="36" x2="74" y2="40"/><line x1="38" y1="12" x2="34" y2="8"/><line x1="38" y1="36" x2="34" y2="40"/></g></svg>
+    </div>
+    <div class="part" data-type="SEG" title="７セグランプ (1・2・4・8の2進入力で0〜Fを表示)">
+      <svg viewBox="0 0 90 48"><g stroke="#2c3e50" stroke-width="2"><line x1="8" y1="10" x2="26" y2="10"/><line x1="8" y1="19" x2="26" y2="19"/><line x1="8" y1="28" x2="26" y2="28"/><line x1="8" y1="37" x2="26" y2="37"/></g><rect x="28" y="4" width="38" height="40" rx="4" fill="#1b2631" stroke="#2c3e50" stroke-width="2"/><g fill="#ff3b30"><rect x="38" y="8" width="18" height="4" rx="1"/><rect x="38" y="22" width="18" height="4" rx="1"/><rect x="38" y="36" width="18" height="4" rx="1"/><rect x="34" y="12" width="4" height="10" rx="1"/><rect x="56" y="12" width="4" height="10" rx="1"/><rect x="34" y="26" width="4" height="10" rx="1"/><rect x="56" y="26" width="4" height="10" rx="1"/></g></svg>
+    </div>
+    <div class="part" data-type="SEG4" title="７セグ４桁 (1・2・4・8の入力を 2進・10進・16進 に切りかえて表示)">
+      <svg viewBox="0 0 90 48"><g stroke="#2c3e50" stroke-width="1.6"><line x1="2" y1="11" x2="12" y2="11"/><line x1="2" y1="19" x2="12" y2="19"/><line x1="2" y1="27" x2="12" y2="27"/><line x1="2" y1="35" x2="12" y2="35"/></g><rect x="12" y="4" width="76" height="40" rx="4" fill="#1b2631" stroke="#2c3e50" stroke-width="2"/><g fill="#ff3b30"><rect x="17" y="8" width="11" height="19" rx="2" fill="none" stroke="#ff3b30" stroke-width="2.4"/><rect x="34" y="8" width="11" height="19" rx="2" fill="none" stroke="#ff3b30" stroke-width="2.4"/><rect x="51" y="8" width="11" height="19" rx="2" fill="none" stroke="#2e4053" stroke-width="2.4"/><rect x="68" y="8" width="11" height="19" rx="2" fill="none" stroke="#ff3b30" stroke-width="2.4"/></g><rect x="17" y="32" width="18" height="8" rx="2" fill="#f39c12"/><rect x="39" y="32" width="18" height="8" rx="2" fill="#566573"/><rect x="61" y="32" width="18" height="8" rx="2" fill="#566573"/></svg>
+    </div>
+    <div class="part" data-type="SEG4H" title="７セグ４桁・上位 (16・32・64・128 の入力。1・2・4・8 の７セグ４桁の左に並べて 8 ビットを読む)">
+      <svg viewBox="0 0 90 48"><g stroke="#2c3e50" stroke-width="1.6"><line x1="2" y1="11" x2="12" y2="11"/><line x1="2" y1="19" x2="12" y2="19"/><line x1="2" y1="27" x2="12" y2="27"/><line x1="2" y1="35" x2="12" y2="35"/></g><rect x="12" y="4" width="76" height="40" rx="4" fill="#1b2631" stroke="#2c3e50" stroke-width="2"/><g fill="none" stroke-width="2.4"><rect x="17" y="8" width="11" height="19" rx="2" stroke="#2e4053"/><rect x="34" y="8" width="11" height="19" rx="2" stroke="#ff3b30"/><rect x="51" y="8" width="11" height="19" rx="2" stroke="#ff3b30"/><rect x="68" y="8" width="11" height="19" rx="2" stroke="#2e4053"/></g><text x="50" y="41" font-size="9" font-weight="bold" fill="#f7dc6f" text-anchor="middle">16・32・64・128</text></svg>
+    </div>
+    <div class="ptitle">基本ゲート</div>
+    <div class="part" data-type="AND" title="AND (両方1のとき1)">
+      <svg viewBox="0 0 90 48"><g stroke="#2c3e50" stroke-width="2" fill="none"><line x1="6" y1="16" x2="26" y2="16"/><line x1="6" y1="32" x2="26" y2="32"/><line x1="62" y1="24" x2="84" y2="24"/></g><path d="M24 8 h22 a16 16 0 0 1 0 32 h-22 z" fill="#fdfefe" stroke="#2c3e50" stroke-width="2"/></svg>
+    </div>
+    <div class="part" data-type="OR" title="OR (どちらかが1なら1)">
+      <svg viewBox="0 0 90 48"><g stroke="#2c3e50" stroke-width="2" fill="none"><line x1="6" y1="16" x2="30" y2="16"/><line x1="6" y1="32" x2="30" y2="32"/><line x1="60" y1="24" x2="84" y2="24"/></g><path d="M22 8 q20 0 38 16 q-18 16 -38 16 q9 -16 0 -32 z" fill="#fdfefe" stroke="#2c3e50" stroke-width="2"/></svg>
+    </div>
+    <div class="part" data-type="NOT" title="NOT (0と1を反転)">
+      <svg viewBox="0 0 90 48"><g stroke="#2c3e50" stroke-width="2" fill="none"><line x1="6" y1="24" x2="24" y2="24"/><line x1="66" y1="24" x2="84" y2="24"/></g><path d="M24 8 L56 24 L24 40 z" fill="#fdfefe" stroke="#2c3e50" stroke-width="2"/><circle cx="61" cy="24" r="4.5" fill="#fdfefe" stroke="#2c3e50" stroke-width="2"/></svg>
+    </div>
+    <div class="ptitle">加算器</div>
+    <div class="part" data-type="HALF" title="半加算器 (A+B → S, C)">
+      <svg viewBox="0 0 90 48"><g stroke="#2c3e50" stroke-width="2" fill="none"><line x1="6" y1="16" x2="24" y2="16"/><line x1="6" y1="32" x2="24" y2="32"/><line x1="64" y1="16" x2="84" y2="16"/><line x1="64" y1="32" x2="84" y2="32"/></g><rect x="24" y="6" width="40" height="36" rx="4" fill="#fdfefe" stroke="#2c3e50" stroke-width="2"/><text x="44" y="29" font-size="15" font-weight="bold" fill="#2c3e50" text-anchor="middle">半</text></svg>
+    </div>
+    <div class="part" data-type="FULL" title="全加算器 (A+B+Ci → S, Co)">
+      <svg viewBox="0 0 90 48"><g stroke="#2c3e50" stroke-width="2" fill="none"><line x1="6" y1="12" x2="24" y2="12"/><line x1="6" y1="24" x2="24" y2="24"/><line x1="6" y1="36" x2="24" y2="36"/><line x1="64" y1="16" x2="84" y2="16"/><line x1="64" y1="32" x2="84" y2="32"/></g><rect x="24" y="6" width="40" height="36" rx="4" fill="#fdfefe" stroke="#2c3e50" stroke-width="2"/><text x="44" y="29" font-size="15" font-weight="bold" fill="#2c3e50" text-anchor="middle">全</text></svg>
+    </div>
+  </div>
+  <div id="canvasWrap"><canvas id="cv" width="2400" height="1500"></canvas></div>
+</div>
+<div id="truthPanel" hidden>
+  <div class="tpHead"><b>真理値表</b><span class="sp"></span><button id="truthClose" title="閉じる">×</button></div>
+  <div id="truthBody"></div>
+</div>
+<div id="status">部品をクリックして選び、キャンバス上でクリックすると配置できます。</div>
+<div id="helpPanel">
+  <h2>使い方</h2>
+  ・左の部品をクリック → キャンバスをクリックで配置(連続配置可、右クリック/Escで終了)<br>
+  ・端子の <b>〇をクリック</b> → つなぎたい相手の <b>〇をクリック</b> で配線(ドラッグでも可)<br>
+  ・<b>入力スイッチ</b> はクリックで 0/1 切り替え<br>
+  ・<b>７セグランプ</b> は 1・2・4・8 の4端子に2進数を入力すると 0〜F と数値を表示<br>
+  ・<b>７セグ４桁</b> は 1・2・4・8 の4端子の値を、下の <b>［2進］［10進］［16進］</b> で切りかえて表示<br>
+  ・<b>７セグ４桁（上位）</b> は 16・32・64・128 の4端子。７セグ４桁の左に並べると <b>8ビット（0〜255）</b> が読める（2進は左右で8けた、16進は左右で2けた、10進は左右の数を足す）<br>
+  ・配線は<b>部品をよけて自動で</b>たて・よこに引かれる（分かれる所に●）<br>
+  ・［線の色］で、0/1 の色（赤・灰）と <b>線ごとの色</b> を切りかえ（線ごとの色では 1 は太く濃く、0 は細く薄く）<br>
+  ・［－］［＋］で回路の絵を小さく・大きく（Ctrl＋ホイールでも）。［全体］で回路が全部見える大きさに<br>
+  ・まちがえたら［元に戻す］（Ctrl＋Z）。戻しすぎたら［進む］（Ctrl＋Y）<br>
+  ・［真理値表］で、入力の全部の組み合わせと出力を表で見る（行をクリックするとスイッチがその組み合わせになる。開いている間に線やゲートをクリックすると、途中の 0/1 も表に出る）<br>
+  ・部品はドラッグで移動<br>
+  ・何もない所からドラッグ → <b>囲んで選択</b><br>
+  ・選択後「コピー配置」(Ctrl+C) → マウスに追従 → クリックで配置(連続可)<br>
+  ・配線はクリックで選択でき、Delキーで削除<br>
+  ・「保存」でテキストファイルに保存、「読み込み」で続きから再開<br>
+  ・授業で使うときは［先生に送る］に 組・番号・合言葉 を入れる（回路が先生の画面に届く）
+</div>
+<script src="config.js"></script>
+<script>
+"use strict";
+const cv = document.getElementById('cv');
+let ctx = cv.getContext('2d');
+const statusBar = document.getElementById('status');
+
+const TYPES = {
+  IN:   { name: '入力',     w: 64,  h: 40,  ins: [],            outs: [''] },
+  OUT:  { name: '出力',     w: 64,  h: 44,  ins: [''],          outs: [] },
+  AND:  { name: 'AND',      w: 88,  h: 56,  ins: ['', ''],      outs: [''] },
+  OR:   { name: 'OR',       w: 88,  h: 56,  ins: ['', ''],      outs: [''] },
+  NOT:  { name: 'NOT',      w: 80,  h: 44,  ins: [''],          outs: [''] },
+  HALF: { name: '半加算器', w: 116, h: 84,  ins: ['A', 'B'],    outs: ['C', 'S'] },   // 上から C（桁上げ）, S（和）
+  FULL: { name: '全加算器', w: 116, h: 108, ins: ['A', 'B', 'Ci'], outs: ['Co', 'S'] }, // 上から Co（桁上げ）, S（和）
+  SEG:  { name: '７セグ',   w: 108, h: 132, ins: ['1', '2', '4', '8'], outs: [] },
+  SEG4: { name: '７セグ４桁', w: 230, h: 124, ins: ['1', '2', '4', '8'], outs: [] },  // state: 0=2進 1=10進 2=16進
+  SEG4H: { name: '７セグ４桁（上位）', w: 230, h: 124, ins: ['16', '32', '64', '128'], outs: [] },  // SEG4 の上位4ビット版
+};
+
+// 7セグメント点灯パターン (bit: a=1,b=2,c=4,d=8,e=16,f=32,g=64)
+const SEG_MAP = [0x3F,0x06,0x5B,0x4F,0x66,0x6D,0x7D,0x07,0x7F,0x6F,0x77,0x7C,0x39,0x5E,0x79,0x71];
+
+let comps = [];   // {id, type, x, y, state}
+let wires = [];   // {from:{c,p}, to:{c,p}}
+let nextId = 1;
+let selection = new Set();   // comp ids
+let selWire = -1;            // wire index
+let clipboard = null;
+
+// modes: idle / place / paste / wire / drag / band
+let mode = 'idle';
+let placeType = null;
+let mouse = { x: 0, y: 0 };
+let dragStart = null, dragOffsets = null, dragMoved = false;
+let wireStart = null;        // {c, kind:'out'|'in', p}
+let bandStart = null;
+
+const snap = v => Math.round(v / 10) * 10;
+const byId = id => comps.find(c => c.id === id);
+
+function pinPos(c, kind, i) {
+  const t = TYPES[c.type];
+  const n = kind === 'in' ? t.ins.length : t.outs.length;
+  return { x: kind === 'in' ? c.x : c.x + t.w, y: c.y + t.h * (i + 1) / (n + 1) };
+}
+
+function setStatus(msg) { statusBar.textContent = msg; }
+
+// ---------- simulation ----------
+function computeValues() {
+  const out = {};
+  comps.forEach(c => out[c.id] = TYPES[c.type].outs.map(() => false));
+  const getIn = (c, i) => {
+    const w = wires.find(w => w.to.c === c.id && w.to.p === i);
+    return w && out[w.from.c] ? !!out[w.from.c][w.from.p] : false;
+  };
+  for (let k = 0; k < comps.length + 2; k++) {
+    for (const c of comps) {
+      switch (c.type) {
+        case 'IN': out[c.id][0] = !!c.state; break;
+        case 'AND': out[c.id][0] = getIn(c, 0) && getIn(c, 1); break;
+        case 'OR': out[c.id][0] = getIn(c, 0) || getIn(c, 1); break;
+        case 'NOT': out[c.id][0] = !getIn(c, 0); break;
+        case 'HALF': {   // 出力は 0 番が C（桁上げ）、1 番が S（和）
+          const a = getIn(c, 0), b = getIn(c, 1);
+          out[c.id][0] = a && b; out[c.id][1] = a !== b; break;
+        }
+        case 'FULL': {   // 出力は 0 番が Co（桁上げ）、1 番が S（和）
+          const a = getIn(c, 0), b = getIn(c, 1), ci = getIn(c, 2);
+          out[c.id][0] = (a && b) || (ci && (a !== b));
+          out[c.id][1] = ((a !== b) !== ci); break;
+        }
+      }
+    }
+  }
+  return { out, getIn };
+}
+
+// ---------- drawing ----------
+// ---------- 配線の経路（部品をよけて、たて・よこの線で引く） ----------
+// 部品そのものを「通れない場所」、そのまわりを「なるべく通らない場所」にして、
+// 端子から端子までの道を探す（A* 探索）。部品どうしが近くても、すき間があれば通る。
+// ・曲がる回数が少ない道を選ぶ
+// ・ほかの線と同じ所を重ねて通らないようにする（同じ出力から分かれる線は重なってよい）
+// 部品や線が変わったときだけ計算し直す。ドラッグ中は仮の線で描く。
+const 通れない幅 = 3;    // 部品の外側この幅までは線を通さない
+const よける幅 = 12;     // 部品の外側この幅までは、なるべく通らない（通ると高くつく）
+const よける重み = 3;    // 「なるべく通らない場所」を通るときの長さの倍率
+const 引き出し長 = 14;   // 端子からまっすぐ出す長さ（近くに部品があれば短くする）
+const 曲がりの重み = 40; // 1 回曲がるごとに足すコスト（長さ 40 ぶん）
+// ほかの線（別の出力から出た線）との関係のコスト
+const 重なりの重み = 30;   // 同じ所を重ねて通る：長さの倍率（ほぼ禁止。ほかに道がないときだけ）
+const 重なりの基本 = 300;
+const 寄りそいの重み = 4;  // すぐとなり（7 未満）を平行に通る：長さの倍率（見た目が重なるので避ける）
+const 寄りそいの幅 = 9;
+const 交差の重み = 12;     // 横切る（交差）：1 回ごと。交差は見分けられるので軽め
+const 角の重み = 400;      // ほかの線の上で曲がる・ほかの線の角や端子の前を通る：接続して見えるので強く避ける
+const やり直し回数 = 2;    // 全部引いたあと、ほかの線を見ながら引き直す回数
+let 経路表 = new Map();  // 線の鍵 → 点の列（読み込み直しても同じ線は同じ鍵）
+const 線の鍵 = w => w.from.c + '.' + w.from.p + '>' + w.to.c + '.' + w.to.p;
+let 経路の印 = '';
+let 分岐点 = [];         // {x, y, c, p}：同じ出力から線が分かれる所（黒丸を打つ）
+
+function 部品の箱(c, 幅) {
+  const t = TYPES[c.type];
+  return { x1: c.x - 幅, y1: c.y - 幅, x2: c.x + t.w + 幅, y2: c.y + t.h + 幅 };
+}
+const 内側 = (x, y, b) => x > b.x1 && x < b.x2 && y > b.y1 && y < b.y2;
+
+// 端子 → 引き出し点 → … → 引き出し点 → 端子 の、いちばん簡単な形（ドラッグ中・道がないとき）
+function 仮の経路(w) {
+  const a = pinPos(byId(w.from.c), 'out', w.from.p);
+  const b = pinPos(byId(w.to.c), 'in', w.to.p);
+  const ax = a.x + 引き出し長, bx = b.x - 引き出し長;
+  if (bx >= ax) {
+    const mx = Math.round((ax + bx) / 2);
+    return [a, { x: mx, y: a.y }, { x: mx, y: b.y }, b];
+  }
+  const my = Math.round((a.y + b.y) / 2);
+  return [a, { x: ax, y: a.y }, { x: ax, y: my }, { x: bx, y: my }, { x: bx, y: b.y }, b];
+}
+
+// 小さな優先度つき待ち行列
+class 待ち行列 {
+  constructor() { this.h = []; }
+  get size() { return this.h.length; }
+  push(k, v) {
+    const h = this.h; h.push([k, v]);
+    let i = h.length - 1;
+    while (i > 0) { const p = (i - 1) >> 1; if (h[p][0] <= h[i][0]) break; [h[p], h[i]] = [h[i], h[p]]; i = p; }
+  }
+  pop() {
+    const h = this.h, top = h[0], last = h.pop();
+    if (h.length) {
+      h[0] = last; let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1; let m = i;
+        if (l < h.length && h[l][0] < h[m][0]) m = l;
+        if (r < h.length && h[r][0] < h[m][0]) m = r;
+        if (m === i) break; [h[m], h[i]] = [h[i], h[m]]; i = m;
+      }
+    }
+    return top;
+  }
+}
+
+function 全部の経路を作る() {
+  経路表 = new Map();
+  分岐点 = [];
+  if (!wires.length) return;
+  const 箱 = comps.map(c => 部品の箱(c, 通れない幅));
+  const 近 = comps.map(c => 部品の箱(c, よける幅));
+  // 線を引く候補の「たて線」「よこ線」：部品の箱の縁、端子の引き出し点、そのあいだ
+  const xs0 = new Set(), ys0 = new Set();
+  箱.concat(近).forEach(b => { xs0.add(b.x1); xs0.add(b.x2); ys0.add(b.y1); ys0.add(b.y2); });
+  // 引き出し点：となりの部品にぶつかるなら短くする
+  const 引き出す = (p, 向き) => {
+    for (let L = 引き出し長; L >= 4; L -= 2) {
+      const q = { x: p.x + 向き * L, y: p.y };
+      if (!箱.some(b => 内側(q.x, q.y, b))) return q;
+    }
+    return { x: p.x + 向き * 4, y: p.y };
+  };
+  const 端 = wires.map(w => {
+    const a = pinPos(byId(w.from.c), 'out', w.from.p), b = pinPos(byId(w.to.c), 'in', w.to.p);
+    const s = 引き出す(a, 1), e = 引き出す(b, -1);
+    xs0.add(s.x); xs0.add(e.x); ys0.add(s.y); ys0.add(e.y);
+    return { a, b, s, e };
+  });
+  const 細かく = set => {
+    const v = [...set].sort((p, q) => p - q), out = [];
+    v.forEach((x, i) => {
+      out.push(x);
+      const n = v[i + 1];
+      if (n !== undefined && n - x >= 20) {                 // すき間には 10 ごとに線を足して、重ならずに並べられるように
+        const k = Math.min(8, Math.floor((n - x) / 10) - 1);
+        for (let j = 1; j <= k; j++) out.push(Math.round(x + (n - x) * j / (k + 1)));
+      }
+    });
+    const lo = out[0] - 40, hi = out[out.length - 1] + 40;   // いちばん外側にも逃げ道
+    return [...new Set([lo, ...out, hi])].sort((p, q) => p - q);
+  };
+  const xs = 細かく(xs0), ys = 細かく(ys0);
+  const nx = xs.length, ny = ys.length;
+  const xi = new Map(xs.map((x, i) => [x, i])), yi = new Map(ys.map((y, j) => [y, j]));
+  // 通れない所・なるべく通らない所の表。除く には、よけない部品の番号を入れる
+  function 障害の表(除く) {
+    const 点 = new Uint8Array(nx * ny), よこ = new Uint8Array(nx * ny), たて = new Uint8Array(nx * ny);
+    const 近よこ = new Uint8Array(nx * ny), 近たて = new Uint8Array(nx * ny);
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const k = i * ny + j, x = xs[i], y = ys[j];
+      const mx = i + 1 < nx ? (x + xs[i + 1]) / 2 : null, my = j + 1 < ny ? (y + ys[j + 1]) / 2 : null;
+      箱.forEach((b, n) => {
+        if (除く && 除く.has(n)) return;
+        if (内側(x, y, b)) 点[k] = 1;
+        if (mx !== null && 内側(mx, y, b)) よこ[k] = 1;
+        if (my !== null && 内側(x, my, b)) たて[k] = 1;
+      });
+      for (const b of 近) {
+        if (mx !== null && 内側(mx, y, b)) 近よこ[k] = 1;
+        if (my !== null && 内側(x, my, b)) 近たて[k] = 1;
+      }
+    }
+    return { 点, よこ, たて, 近よこ, 近たて };
+  }
+  const ふだん = 障害の表(null);
+  // ---- ほかの線の使い方の記録（線のかたまり＝同じ出力から出た線ごとに数える）----
+  const 辺の番号 = (k, 向き) => k * 2 + 向き;   // 向き 0=よこ 1=たて
+  const 辺の使用 = new Map(), 点の使用 = new Map(), 角の使用 = new Map();
+  const 足す = (表, 鍵, 印, d) => {
+    let m = 表.get(鍵); if (!m) { m = new Map(); 表.set(鍵, m); }
+    const v = (m.get(印) || 0) + d; if (v > 0) m.set(印, v); else m.delete(印);
+  };
+  const ほかが = (表, 鍵, 印) => { const m = 表.get(鍵); if (!m) return false; for (const k of m.keys()) if (k !== 印) return true; return false; };
+  const 記録 = new Map();   // 線の番号 → { 印, 辺[], 点[], 角[] }
+  const 記録する = (n, r, d) => {
+    r.辺.forEach(x => 足す(辺の使用, x, r.印, d));
+    r.点.forEach(x => 足す(点の使用, x, r.印, d));
+    r.角.forEach(x => 足す(角の使用, x, r.印, d));
+  };
+  // 端子の引き出し点は、その線の「角」として先に記録（ほかの線が前を通ると、つながって見えるので）
+  const 線の印 = wires.map(w => w.from.c + ':' + w.from.p);
+  const 番号 = (x, y) => xi.get(x) * ny + yi.get(y);
+  wires.forEach((w, n) => {
+    const { s, e } = 端[n];
+    足す(角の使用, 番号(s.x, s.y), 線の印[n], 1);
+    足す(角の使用, 番号(e.x, e.y), 線の印[n], 1);
+  });
+  // となりの平行な線（寄りそい）を調べるため、近い格子線の番号を先に求めておく
+  const 近い列 = xs.map((x, i) => [i - 1, i + 1].filter(k => k >= 0 && k < nx && Math.abs(xs[k] - x) < 寄りそいの幅));
+  const 近い行 = ys.map((y, j) => [j - 1, j + 1].filter(k => k >= 0 && k < ny && Math.abs(ys[k] - y) < 寄りそいの幅));
+
+  const 順 = wires.map((w, n) => n).sort((p, q) => {
+    const d = n => Math.abs(端[n].e.x - 端[n].s.x) + Math.abs(端[n].e.y - 端[n].s.y);
+    return d(p) - d(q);
+  });
+  const 動き = [[1, 0], [-1, 0], [0, 1], [0, -1]];   // 向き 0:右 1:左 2:下 3:上
+  const 全数 = nx * ny * 4;
+  const 費用 = new Float64Array(全数), 前 = new Int32Array(全数), 札 = new Int32Array(全数);
+  let 今の札 = 0;
+
+  function 一本引く(n) {
+    const w = wires[n], { a, b, s, e } = 端[n], 印 = 線の印[n];
+    const 始 = 番号(s.x, s.y), 終 = 番号(e.x, e.y);
+    // 端子のすぐ前に別の部品がくっついているときは、その部品だけ よけずに道を探す（重なるのはそこだけ）
+    let 表 = ふだん;
+    if (表.点[始] || 表.点[終]) {
+      const 除く = new Set();
+      箱.forEach((bx, k) => { if (内側(s.x, s.y, bx) || 内側(e.x, e.y, bx)) 除く.add(k); });
+      表 = 障害の表(除く);
+    }
+    const 通れない点 = 表.点, 通れないよこ = 表.よこ, 通れないたて = 表.たて, 近いよこ = 表.近よこ, 近いたて = 表.近たて;
+    if (通れない点[始] || 通れない点[終]) return null;
+    今の札++;
+    const 値 = st => 札[st] === 今の札 ? 費用[st] : Infinity;
+    const q = new 待ち行列();
+    const 見込み = k => Math.abs(xs[(k / ny) | 0] - e.x) + Math.abs(ys[k % ny] - e.y);
+    札[始 * 4] = 今の札; 費用[始 * 4] = 0; 前[始 * 4] = -1; q.push(見込み(始), 始 * 4);
+    let 着 = -1, 回 = 0;
+    while (q.size && 回++ < 300000) {
+      const [f, st] = q.pop();
+      const k = st >> 2, d = st & 3, g = 値(st);
+      if (f - 見込み(k) > g + 1e-6) continue;
+      if (k === 終 && d === 0) { 着 = st; break; }
+      const i = (k / ny) | 0, j = k % ny;
+      for (let nd = 0; nd < 4; nd++) {
+        if ((d ^ nd) === 1 && (d >> 1) === (nd >> 1)) continue;   // 逆もどりはしない
+        const [di, dj] = 動き[nd], ni = i + di, nj = j + dj;
+        if (ni < 0 || nj < 0 || ni >= nx || nj >= ny) continue;
+        const nk = ni * ny + nj;
+        if (通れない点[nk]) continue;
+        let 辺, 近い, となり = 0;
+        const 長さ = Math.abs(xs[ni] - xs[i]) + Math.abs(ys[nj] - ys[j]);
+        if (dj === 0) {
+          const m = Math.min(i, ni) * ny + j; if (通れないよこ[m]) continue; 辺 = 辺の番号(m, 0); 近い = 近いよこ[m];
+          for (const jj of 近い行[j]) if (ほかが(辺の使用, 辺の番号(Math.min(i, ni) * ny + jj, 0), 印)) となり = 1;
+        } else {
+          const m = i * ny + Math.min(j, nj); if (通れないたて[m]) continue; 辺 = 辺の番号(m, 1); 近い = 近いたて[m];
+          for (const ii of 近い列[i]) if (ほかが(辺の使用, 辺の番号(ii * ny + Math.min(j, nj), 1), 印)) となり = 1;
+        }
+        let c = 長さ * (近い ? よける重み : 1);
+        if (ほかが(辺の使用, 辺, 印)) c += 長さ * 重なりの重み + 重なりの基本;
+        if (となり) c += 長さ * 寄りそいの重み;
+        if (nd !== d) {
+          c += 曲がりの重み;
+          if (ほかが(点の使用, k, 印)) c += 角の重み;          // ほかの線の上で曲がる
+        }
+        if (nk !== 終 && ほかが(角の使用, nk, 印)) c += 角の重み;  // ほかの線の角・端子の前を通る
+        if (ほかが(点の使用, nk, 印)) c += 交差の重み;
+        if (nk === 終 && nd !== 0) c += 曲がりの重み * 2;   // 入力端子へは右向きに入りたい
+        const ns = nk * 4 + nd, ng = g + c;
+        if (ng < 値(ns)) { 札[ns] = 今の札; 費用[ns] = ng; 前[ns] = st; q.push(ng + 見込み(nk), ns); }
+      }
+    }
+    if (着 < 0) return null;
+    // たどって、点の列と使った所を集める
+    const 格子 = [];
+    for (let st = 着; st >= 0; st = 前[st]) 格子.push(st);
+    格子.reverse();
+    const r = { 印, 辺: [], 点: [], 角: [], 点列: [] };
+    格子.forEach((st, t) => {
+      const k = st >> 2;
+      r.点.push(k);
+      r.点列.push({ x: xs[(k / ny) | 0], y: ys[k % ny] });
+      if (t > 0) {
+        const k2 = 格子[t - 1] >> 2, i1 = (k / ny) | 0, j1 = k % ny, i2 = (k2 / ny) | 0, j2 = k2 % ny;
+        r.辺.push(j1 === j2 ? 辺の番号(Math.min(i1, i2) * ny + j1, 0) : 辺の番号(i1 * ny + Math.min(j1, j2), 1));
+        if (t < 格子.length - 1 && (格子[t + 1] & 3) !== (st & 3)) r.角.push(k);
+      }
+    });
+    return r;
+  }
+
+  // ほかの線とぶつかっている（重なり・寄りそい・角）かどうか
+  const ぶつかる = (n, r) => {
+    const 印 = r.印;
+    if (r.辺.some(x => ほかが(辺の使用, x, 印))) return true;
+    if (r.角.some(k => ほかが(点の使用, k, 印))) return true;
+    if (r.点.slice(1, -1).some(k => ほかが(角の使用, k, 印))) return true;
+    return r.辺.some(x => {
+      const m = x >> 1, 向き = x & 1, i = (m / ny) | 0, j = m % ny;
+      return 向き === 0 ? 近い行[j].some(jj => ほかが(辺の使用, 辺の番号(i * ny + jj, 0), 印))
+                       : 近い列[i].some(ii => ほかが(辺の使用, 辺の番号(ii * ny + j, 1), 印));
+    });
+  };
+  // 1 回目：短い線から順に引く。2 回目から：ぶつかっている線だけ、自分をいったん消して、ほかの線を全部見ながら引き直す
+  for (let 回 = 0; 回 <= やり直し回数; 回++) {
+    for (const n of 順) {
+      if (回 > 0 && (!記録.get(n) || !ぶつかる(n, 記録.get(n)))) continue;
+      const 旧 = 記録.get(n);
+      if (旧) 記録する(n, 旧, -1);
+      const r = 一本引く(n);
+      if (r) { 記録.set(n, r); 記録する(n, r, 1); }
+      else if (旧) { 記録.set(n, 旧); 記録する(n, 旧, 1); }
+      else 記録.delete(n);
+    }
+  }
+  wires.forEach((w, n) => {
+    const r = 記録.get(n);
+    if (!r) { 経路表.set(線の鍵(w), 仮の経路(w)); return; }
+    const { a, b } = 端[n];
+    const 全 = [a, ...r.点列, b];
+    // まっすぐ並んだ点を間引く
+    const 簡 = [全[0]];
+    for (let t = 1; t < 全.length - 1; t++) {
+      const p = 簡[簡.length - 1], c = 全[t], nx2 = 全[t + 1];
+      if ((p.x === c.x && c.x === nx2.x) || (p.y === c.y && c.y === nx2.y)) continue;
+      簡.push(c);
+    }
+    簡.push(全[全.length - 1]);
+    経路表.set(線の鍵(w), 簡);
+  });
+  分岐点を探す();
+}
+
+// 同じ出力から出た線どうしが分かれる所を探す
+function 分岐点を探す() {
+  const かたまり = new Map();
+  wires.forEach(w => {
+    const k = w.from.c + ':' + w.from.p;
+    if (!かたまり.has(k)) かたまり.set(k, []);
+    かたまり.get(k).push(w);
+  });
+  for (const 組 of かたまり.values()) {
+    if (組.length < 2) continue;
+    const 済 = [];
+    for (const w of 組) {
+      const 点 = 経路表.get(線の鍵(w));
+      if (!点) continue;
+      if (済.length) {
+        let 最後 = null;
+        外: for (let t = 0; t < 点.length - 1; t++) {
+          const a = 点[t], b = 点[t + 1], L = Math.max(1, Math.abs(b.x - a.x) + Math.abs(b.y - a.y));
+          for (let s = 0; s <= L; s += 2) {
+            const x = a.x + (b.x - a.x) * s / L, y = a.y + (b.y - a.y) * s / L;
+            if (済.some(P => 線までの距離2(x, y, P) < 2.5)) 最後 = { x, y }; else break 外;
+          }
+        }
+        if (最後 && !分岐点.some(d => Math.abs(d.x - 最後.x) + Math.abs(d.y - 最後.y) < 4))
+          分岐点.push({ x: Math.round(最後.x), y: Math.round(最後.y), c: w.from.c, p: w.from.p });
+      }
+      済.push(点);
+    }
+  }
+}
+
+function 経路の印を作る() {
+  return comps.map(c => c.id + ',' + c.type + ',' + c.x + ',' + c.y).join(';') + '|' +
+         wires.map(w => w.from.c + '.' + w.from.p + '>' + w.to.c + '.' + w.to.p).join(';');
+}
+// 毎フレーム呼ぶ。変化があり、ドラッグ中でなければ計算し直す
+function 経路をそろえる() {
+  if (mode === 'drag' && dragMoved) return;
+  const 印 = 経路の印を作る();
+  if (印 !== 経路の印) { 経路の印 = 印; 全部の経路を作る(); }
+}
+function 線の点(w) {
+  if (mode === 'drag' && dragMoved && (selection.has(w.from.c) || selection.has(w.to.c))) return 仮の経路(w);
+  return 経路表.get(線の鍵(w)) || 仮の経路(w);
+}
+function 折れ線を描く(点) {
+  ctx.beginPath();
+  ctx.moveTo(点[0].x, 点[0].y);
+  for (let t = 1; t < 点.length - 1; t++) {
+    const p = 点[t - 1], c = 点[t], n = 点[t + 1];
+    const r = Math.min(7, Math.hypot(c.x - p.x, c.y - p.y) / 2, Math.hypot(n.x - c.x, n.y - c.y) / 2);
+    ctx.arcTo(c.x, c.y, n.x, n.y, r);
+  }
+  ctx.lineTo(点[点.length - 1].x, 点[点.length - 1].y);
+}
+function 線までの距離2(px, py, 点) {
+  let best = Infinity;
+  for (let t = 0; t < 点.length - 1; t++) {
+    const a = 点[t], b = 点[t + 1], dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy;
+    const u = L ? Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / L)) : 0;
+    const qx = a.x + u * dx - px, qy = a.y + u * dy - py;
+    best = Math.min(best, qx * qx + qy * qy);
+  }
+  return best;
+}
+
+function drawComp(c, vals, ghost) {
+  const t = TYPES[c.type];
+  const { x, y } = c, w = t.w, h = t.h;
+  ctx.save();
+  if (ghost) ctx.globalAlpha = 0.45;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#2c3e50';
+  ctx.fillStyle = '#fdfefe';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const bx = x + 14, bw = w - 28;
+
+  // terminal stubs
+  t.ins.forEach((_, i) => {
+    const p = pinPos(c, 'in', i);
+    // OR は左がへこんだ曲線なので、足をその曲線まで伸ばす（曲線は y + h(1-s) の所で x = bx + 2s(1-s)·0.3·bw）
+    let 端 = bx;
+    if (c.type === 'OR') { const s = 1 - (p.y - y) / h; 端 = bx + 2 * s * (1 - s) * 0.3 * bw; }
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(端, p.y); ctx.stroke();
+  });
+  t.outs.forEach((_, i) => {
+    const p = pinPos(c, 'out', i);
+    ctx.beginPath(); ctx.moveTo(bx + bw, p.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+  });
+
+  if (c.type === 'AND') {
+    ctx.beginPath();
+    ctx.moveTo(bx, y);
+    ctx.lineTo(bx + bw - h / 2, y);
+    ctx.arc(bx + bw - h / 2, y + h / 2, h / 2, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(bx, y + h);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2c3e50'; ctx.fillText('AND', bx + bw / 2 - 4, y + h / 2);
+  } else if (c.type === 'OR') {
+    ctx.beginPath();
+    ctx.moveTo(bx, y);
+    ctx.quadraticCurveTo(bx + bw * 0.75, y, bx + bw, y + h / 2);
+    ctx.quadraticCurveTo(bx + bw * 0.75, y + h, bx, y + h);
+    ctx.quadraticCurveTo(bx + bw * 0.3, y + h / 2, bx, y);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2c3e50'; ctx.fillText('OR', bx + bw / 2 + 2, y + h / 2);
+  } else if (c.type === 'NOT') {
+    ctx.beginPath();
+    ctx.moveTo(bx, y);
+    ctx.lineTo(bx + bw - 10, y + h / 2);
+    ctx.lineTo(bx, y + h);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx + bw - 5, y + h / 2, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2c3e50'; ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('NOT', bx + bw * 0.3, y + h / 2);
+  } else if (c.type === 'IN') {
+    const on = !!c.state;
+    const 線色 = 端子の色(c, 'out', 0);
+    ctx.fillStyle = on ? (線色 || '#2ecc71') : '#ecf0f1';
+    roundRect(bx, y, bw, h, 8); ctx.fill();
+    if (線色 && !on) { ctx.strokeStyle = 線色; ctx.lineWidth = 2.5; }
+    ctx.stroke(); ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2;
+    ctx.fillStyle = on ? '#fff' : '#7f8c8d';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText(on ? '1' : '0', bx + bw / 2, y + h / 2 + 1);
+  } else if (c.type === 'OUT') {
+    const on = vals ? vals.getIn(c, 0) : false;
+    ctx.beginPath(); ctx.arc(bx + bw / 2, y + h / 2, h / 2 - 2, 0, Math.PI * 2);
+    ctx.fillStyle = on ? '#f1c40f' : '#ecf0f1'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = on ? '#7d6608' : '#95a5a6';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText(on ? '1' : '0', bx + bw / 2, y + h / 2 + 1);
+  } else if (c.type === 'SEG4' || c.type === 'SEG4H') {
+    const 上位 = c.type === 'SEG4H';   // 上位なら n は 16 の位の数（0〜15）
+    let n = 0;
+    if (vals) [1, 2, 4, 8].forEach((k, i) => { if (vals.getIn(c, i)) n += k; });
+    const 方 = c.state | 0;
+    ctx.fillStyle = '#1b2631';
+    roundRect(bx, y, bw, h, 6); ctx.fill(); ctx.stroke();
+    // 4 桁ぶんの数字（null は消灯）
+    let 桁値;
+    if (方 === 0) 桁値 = [8, 4, 2, 1].map(k => (n & k) ? 1 : 0);
+    else {
+      const s = 方 === 1 ? String(上位 ? n * 16 : n) : n.toString(16).toUpperCase();
+      桁値 = [null, null, null, null];
+      [...s].reverse().forEach((ch, i) => { 桁値[3 - i] = parseInt(ch, 16); });
+    }
+    const dw = 32, dh = 56, gap = 10, th = 7, dy0 = y + 10;
+    const x0 = bx + (bw - (dw * 4 + gap * 3)) / 2;
+    桁値.forEach((v, d) => {
+      const dx0 = x0 + d * (dw + gap), seg = v === null ? 0 : SEG_MAP[v];
+      const segs = [
+        [dx0 + th/2, dy0, dw - th, th], [dx0 + dw - th, dy0 + th/2, th, dh/2 - th],
+        [dx0 + dw - th, dy0 + dh/2 + th/2, th, dh/2 - th], [dx0 + th/2, dy0 + dh - th, dw - th, th],
+        [dx0, dy0 + dh/2 + th/2, th, dh/2 - th], [dx0, dy0 + th/2, th, dh/2 - th],
+        [dx0 + th/2, dy0 + dh/2 - th/2, dw - th, th]
+      ];
+      segs.forEach((s, i) => {
+        ctx.fillStyle = (seg >> i) & 1 ? '#ff3b30' : '#2e4053';
+        roundRect(s[0], s[1], s[2], s[3], 2.2); ctx.fill();
+      });
+      // 2進のときは各けたの重み（8 4 2 1）を下に小さく
+      if (方 === 0) {
+        ctx.fillStyle = '#85929e'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(String((上位 ? [128, 64, 32, 16] : [8, 4, 2, 1])[d]), dx0 + dw / 2, dy0 + dh + 9);
+      }
+      if (上位 && 方 === 2 && d === 3) {
+        ctx.fillStyle = '#85929e'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('16の位', dx0 + dw / 2, dy0 + dh + 9);
+      }
+    });
+    // 表示の切りかえボタン
+    セグ4のボタン(c).forEach((r, i) => {
+      ctx.fillStyle = i === 方 ? '#f39c12' : '#34495e';
+      roundRect(r.x, r.y, r.w, r.h, 4); ctx.fill();
+      ctx.fillStyle = i === 方 ? '#1b2631' : '#d5dbdb'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(['2進', '10進', '16進'][i], r.x + r.w / 2, r.y + r.h / 2 + 1);
+    });
+    // 入力端子の名前
+    ctx.fillStyle = '#aeb6bf'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+    t.ins.forEach((lbl, i) => { const p = pinPos(c, 'in', i); ctx.fillText(lbl, bx + 3, p.y); });
+    ctx.textAlign = 'center';
+  } else if (c.type === 'SEG') {
+    const 重み = [1, 2, 4, 8];
+    let n = 0;
+    if (vals) 重み.forEach((k, i) => { if (vals.getIn(c, i)) n += k; });
+    ctx.fillStyle = '#1b2631';
+    roundRect(bx, y, bw, h, 6); ctx.fill(); ctx.stroke();
+    // digit geometry
+    const dw = 36, dh = 64, dy0 = y + 10, th = 8;
+    const 桁 = [[bx + (bw - dw) / 2, SEG_MAP[n]]];
+    桁.forEach(([dx0, seg]) => {
+      const segs = [
+        [dx0 + th/2, dy0, dw - th, th],                    // a top
+        [dx0 + dw - th, dy0 + th/2, th, dh/2 - th],        // b top-right
+        [dx0 + dw - th, dy0 + dh/2 + th/2, th, dh/2 - th], // c bottom-right
+        [dx0 + th/2, dy0 + dh - th, dw - th, th],          // d bottom
+        [dx0, dy0 + dh/2 + th/2, th, dh/2 - th],           // e bottom-left
+        [dx0, dy0 + th/2, th, dh/2 - th],                  // f top-left
+        [dx0 + th/2, dy0 + dh/2 - th/2, dw - th, th]       // g middle
+      ];
+      segs.forEach((s, i) => {
+        ctx.fillStyle = (seg >> i) & 1 ? '#ff3b30' : '#2e4053';
+        roundRect(s[0], s[1], s[2], s[3], 2.5); ctx.fill();
+      });
+    });
+    // numeric value display
+    ctx.fillStyle = '#f7dc6f'; ctx.font = 'bold 17px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(String(n), bx + bw / 2, y + h - 30);
+    ctx.fillStyle = '#85929e'; ctx.font = '10px sans-serif';
+    ctx.fillText('(16進: ' + n.toString(16).toUpperCase() + ')',
+                 bx + bw / 2, y + h - 13);
+    // input pin labels
+    ctx.fillStyle = '#aeb6bf'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+    t.ins.forEach((lbl, i) => { const p = pinPos(c, 'in', i); ctx.fillText(lbl, bx + 3, p.y); });
+    ctx.textAlign = 'center';
+  } else { // HALF / FULL
+    roundRect(bx, y, bw, h, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2c3e50'; ctx.font = 'bold 13px sans-serif';
+    ctx.save();
+    ctx.translate(bx + bw / 2, y + h / 2);
+    for (let i = 0; i < t.name.length; i++) {
+      ctx.fillText(t.name[i], 0, (i - (t.name.length - 1) / 2) * 15);
+    }
+    ctx.restore();
+    ctx.font = '10px sans-serif'; ctx.fillStyle = '#566573';
+    t.ins.forEach((lbl, i) => { const p = pinPos(c, 'in', i); ctx.textAlign = 'left'; ctx.fillText(lbl, bx + 4, p.y); });
+    t.outs.forEach((lbl, i) => { const p = pinPos(c, 'out', i); ctx.textAlign = 'right'; ctx.fillText(lbl, bx + bw - 4, p.y); });
+    ctx.textAlign = 'center';
+  }
+
+  // terminals
+  t.ins.forEach((_, i) => drawPin(pinPos(c, 'in', i), vals ? vals.getIn(c, i) : false, 端子の色(c, 'in', i)));
+  t.outs.forEach((_, i) => drawPin(pinPos(c, 'out', i), vals && vals.out[c.id] ? vals.out[c.id][i] : false, 端子の色(c, 'out', i)));
+
+  // selection highlight
+  if (!ghost && selection.has(c.id)) {
+    ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
+    ctx.strokeRect(x - 5, y - 5, w + 10, h + 10);
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+function drawPin(p, on, 色) {
+  ctx.beginPath(); ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = on ? (色 || '#e74c3c') : '#fff';
+  ctx.fill();
+  ctx.lineWidth = 1.5; ctx.strokeStyle = '#2c3e50'; ctx.stroke();
+}
+
+// ７セグ４桁の［2進］［10進］［16進］ボタンの位置（回路の座標）
+function セグ4のボタン(c) {
+  // 左の端子の名前（1・2・4・8）と重ならないよう、ボタンは４けたの数字と同じ幅にそろえる
+  const t = TYPES.SEG4, bx = c.x + 14, bw = t.w - 28, bh = 20, by = c.y + t.h - bh - 8;
+  const 全幅 = 32 * 4 + 10 * 3, 左 = bx + (bw - 全幅) / 2, 幅 = (全幅 - 12) / 3;
+  return [0, 1, 2].map(i => ({ x: 左 + i * (幅 + 6), y: by, w: 幅, h: bh }));
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// ---------- 線の色 ----------
+// 線のかたまり（同じ出力から出た線）ごとの色。赤は 1 の色と紛れるので使わない。24 色。
+const 線の色の並び = ['#2471a3', '#1e8449', '#8e44ad', '#d68910', '#148f77', '#a04000', '#c2185b', '#7d6608',
+  '#3f51b5', '#b0179f', '#126bd9', '#6f382a', '#7e305f', '#678e0b', '#17656d', '#4b6024',
+  '#35478d', '#169829', '#820fb3', '#aa6b41', '#604e24', '#5d6d7e', '#00838f', '#1b4f72'];
+// 色どうしの「見た目のちがい」（CIELAB の距離）。近くを通る線に、似た色をつけないために使う
+const 色の差 = (() => {
+  const lab = h => {
+    const f = v => { v = parseInt(v, 16) / 255; return v > 0.04045 ? ((v + 0.055) / 1.055) ** 2.4 : v / 12.92; };
+    const r = f(h.slice(1, 3)), g = f(h.slice(3, 5)), b = f(h.slice(5, 7));
+    const F = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+    const X = F((r * .4124 + g * .3576 + b * .1805) / .95047), Y = F(r * .2126 + g * .7152 + b * .0722), Z = F((r * .0193 + g * .1192 + b * .9505) / 1.08883);
+    return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+  };
+  const L = 線の色の並び.map(lab);
+  return L.map(a => L.map(b => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])));
+})();
+let 線の色の方式 = (() => { try { return localStorage.getItem('logicsim-線の色') || '01'; } catch (e) { return '01'; } })();
+let 色表 = new Map(), 色表の印 = '';
+function 線のかたまりの色(c, p) {
+  if (経路の印 !== 色表の印 || !色表.size) {
+    色表の印 = 経路の印; 色表 = new Map();
+    // かたまりごとに、線が通るマス（30px）を集める
+    const マス = 30, 通る = new Map(), 場所 = new Map();
+    wires.forEach(w => {
+      const k = w.from.c + ':' + w.from.p;
+      if (!通る.has(k)) 通る.set(k, new Set());
+      const 集 = 通る.get(k), 点 = 線の点(w);
+      for (let t = 0; t < 点.length - 1; t++) {
+        const a = 点[t], b = 点[t + 1], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 10));
+        for (let s = 0; s <= n; s++) {
+          const x = a.x + (b.x - a.x) * s / n, y = a.y + (b.y - a.y) * s / n;
+          集.add(Math.floor(x / マス) + ',' + Math.floor(y / マス));
+        }
+      }
+    });
+    通る.forEach((集, k) => 集.forEach(m => { if (!場所.has(m)) 場所.set(m, []); 場所.get(m).push(k); }));
+    // 同じマスを通る（＝近い・交わる）かたまりどうしを「となり」とする
+    const となり = new Map([...通る.keys()].map(k => [k, new Set()]));
+    場所.forEach(ks => ks.forEach(a => ks.forEach(b => { if (a !== b) となり.get(a).add(b); })));
+    // 出力の部品の位置（上から・左から）の順に、となりの色となるべくちがう色をえらぶ。
+    // 入力スイッチ（とクロック・ボタン）から出る線を先に決める：入力どうしは必ず別の色にし、
+    // できるだけ見分けやすい色どうしにする。ほかの線には、入力の色はなるべく使わない。
+    const 入力の型 = new Set(['IN', 'CLK', 'BTN']);
+    const 順 = [...通る.keys()].map(k => {
+      const [id, pp] = k.split(':').map(Number), 部品 = byId(id);
+      return { k, x: 部品 ? 部品.x : 0, y: 部品 ? 部品.y : 0, p: pp, 入力: !!部品 && 入力の型.has(部品.type) };
+    }).sort((a, b) => (b.入力 - a.入力) || a.y - b.y || a.x - b.x || a.p - b.p);
+    const 使った数 = 線の色の並び.map(() => 0), 番号 = new Map(), 入力の色 = new Set();
+    順.forEach(({ k, 入力 }) => {
+      const 近い色 = [...となり.get(k)].filter(j => 番号.has(j)).map(j => 番号.get(j));
+      const 入力どうし = 入力 ? [...入力の色] : [];
+      const 空き = 入力 && 入力の色.size < 線の色の並び.length;   // 入力にまだ使っていない色が残っている
+      let 一番 = 0, 点数 = -1e9;
+      線の色の並び.forEach((_, i) => {
+        if (空き && 入力の色.has(i)) return;                          // 入力どうしは同じ色にしない
+        const 差 = 近い色.length ? Math.min(...近い色.map(j => 色の差[i][j])) : 100;
+        let s;
+        if (入力) {
+          // 入力どうしの見分けやすさを第一に、次に近くの線との差
+          const 入差 = 入力どうし.length ? Math.min(...入力どうし.map(j => 色の差[i][j])) : 100;
+          s = Math.min(入差, 60) * 1000 + Math.min(差, 30) * 10 - i * 0.01;
+        } else {
+          // 似ていない色を優先し、同じくらいなら使った回数の少ない色。入力の色と同じ・似た色は避ける
+          const 入似 = 入力の色.size ? Math.min(...[...入力の色].map(j => 色の差[i][j])) : 100;
+          s = Math.min(差, 30) * 100 - 使った数[i] - (入力の色.has(i) ? 5000 : 0) - Math.max(0, 25 - 入似) * 60;
+        }
+        if (s > 点数) { 点数 = s; 一番 = i; }
+      });
+      if (入力) 入力の色.add(一番);
+      番号.set(k, 一番); 使った数[一番]++; 色表.set(k, 線の色の並び[一番]);
+    });
+  }
+  return 色表.get(c + ':' + p) || '#2471a3';
+}
+// 線ごとの色のときだけ、その端子につながる線の色を返す（線がなければ null）
+function 端子の色(c, 向き, i) {
+  if (線の色の方式 !== '線ごと' || !c || c.id < 0) return null;
+  if (向き === 'out') return wires.some(w => w.from.c === c.id && w.from.p === i) ? 線のかたまりの色(c.id, i) : null;
+  const w = wires.find(w => w.to.c === c.id && w.to.p === i);
+  return w ? 線のかたまりの色(w.from.c, w.from.p) : null;
+}
+function 線の色を切りかえる() {
+  線の色の方式 = 線の色の方式 === '線ごと' ? '01' : '線ごと';
+  try { localStorage.setItem('logicsim-線の色', 線の色の方式); } catch (e) { }
+  setStatus(線の色の方式 === '線ごと'
+    ? '線ごとの色にしました（つながっている線は同じ色。1 は太く濃く、0 は細く薄く）。'
+    : '0/1 の色にしました（1 は赤、0 は灰色）。');
+}
+
+// ---------- 表示の大きさ ----------
+// 回路の座標（世界）は 2400×1500 から始まる。キャンバスの画素数だけを倍率に合わせて変え、描くときに縮める。
+// 部品が右や下の端に近づいたら、世界を広げる（端の先にも 400 の余白をとる）。
+const 世界の最小 = { 幅: cv.width, 高さ: cv.height }, 世界の余白 = 400, 世界の最大 = { 幅: 8000, 高さ: 6000 };
+let 世界の幅 = cv.width, 世界の高さ = cv.height;
+function 世界の大きさをそろえる() {
+  // 小さく表示しているときも、見えている所はぜんぶ置ける場所にする
+  const 見える = document.getElementById('canvasWrap');
+  let w = Math.max(世界の最小.幅, 見える.clientWidth / 表示倍率), h = Math.max(世界の最小.高さ, 見える.clientHeight / 表示倍率);
+  comps.forEach(c => { const T = TYPES[c.type]; if (T) { w = Math.max(w, c.x + T.w + 世界の余白); h = Math.max(h, c.y + T.h + 世界の余白); } });
+  w = Math.min(世界の最大.幅, Math.ceil(w / 100) * 100); h = Math.min(世界の最大.高さ, Math.ceil(h / 100) * 100);
+  if (mode === 'drag' || mode === 'band') { w = Math.max(w, 世界の幅); h = Math.max(h, 世界の高さ); }   // 動かしている間は縮めない
+  if (w === 世界の幅 && h === 世界の高さ) return;
+  const 枠 = document.getElementById('canvasWrap'), sl = 枠.scrollLeft, st = 枠.scrollTop;
+  世界の幅 = w; 世界の高さ = h;
+  cv.width = Math.round(w * 表示倍率); cv.height = Math.round(h * 表示倍率);
+  枠.scrollLeft = sl; 枠.scrollTop = st;
+}
+const 倍率の段 = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5];
+let 表示倍率 = 1;
+function 表示倍率を変える(z, 中心) {
+  z = Math.max(倍率の段[0], Math.min(倍率の段[倍率の段.length - 1], Math.round(z * 100) / 100));
+  const 枠 = document.getElementById('canvasWrap');
+  // 画面の上で動かさない点（省くと枠のまん中）
+  const sx = 中心 ? 中心.sx : 枠.clientWidth / 2, sy = 中心 ? 中心.sy : 枠.clientHeight / 2;
+  const wx = (枠.scrollLeft + sx) / 表示倍率, wy = (枠.scrollTop + sy) / 表示倍率;
+  表示倍率 = z;
+  cv.width = Math.round(世界の幅 * z); cv.height = Math.round(世界の高さ * z);
+  枠.scrollLeft = wx * z - sx; 枠.scrollTop = wy * z - sy;
+  document.getElementById('btnZoom100').textContent = Math.round(z * 100) + '%';
+  try { localStorage.setItem('logicsim-倍率', String(z)); } catch (e) { }
+}
+function 一段かえる(向き) {
+  const 次 = 向き > 0 ? 倍率の段.find(s => s > 表示倍率 + 0.001) : [...倍率の段].reverse().find(s => s < 表示倍率 - 0.001);
+  if (次) 表示倍率を変える(次);
+  setStatus(`表示の大きさ：${Math.round(表示倍率 * 100)}%（回路の大きさは変わりません）`);
+}
+function 全体を見せる() {
+  if (!comps.length) { 表示倍率を変える(1); setStatus('まだ部品がありません。100% にしました。'); return; }
+  let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+  comps.forEach(c => { const T = TYPES[c.type]; x1 = Math.min(x1, c.x); y1 = Math.min(y1, c.y); x2 = Math.max(x2, c.x + T.w); y2 = Math.max(y2, c.y + T.h); });
+  wires.forEach(w => 線の点(w).forEach(p => { x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y); x2 = Math.max(x2, p.x); y2 = Math.max(y2, p.y); }));
+  const 枠 = document.getElementById('canvasWrap'), 余 = 30;
+  let z = Math.min(1, (枠.clientWidth - 8) / (x2 - x1 + 余 * 2), (枠.clientHeight - 8) / (y2 - y1 + 余 * 2));
+  z = Math.max(倍率の段[0], Math.floor(z * 20) / 20);
+  表示倍率を変える(z);
+  枠.scrollLeft = Math.max(0, (x1 - 余) * z); 枠.scrollTop = Math.max(0, (y1 - 余) * z);
+  setStatus(`回路が全部見える大きさ（${Math.round(z * 100)}%）にしました。`);
+}
+
+// ---------- 元に戻す・進む ----------
+// 毎回の描画で、部品の置き場所と線（経路の印と同じもの）が変わったかを見る。変わっていたら前の形を積む。
+const 戻せる数 = 100;
+let 戻す山 = [], 進む山 = [], 今の写し = null, 今の印 = null;
+function 写しを作る() {
+  return { comps: comps.map(c => ({ id: c.id, type: c.type, x: c.x, y: c.y, state: c.state })),
+           wires: wires.map(w => ({ from: { c: w.from.c, p: w.from.p }, to: { c: w.to.c, p: w.to.p } })), nextId };
+}
+function 写しを入れる(s) {
+  comps = s.comps.map(c => ({ ...c }));
+  wires = s.wires.map(w => ({ from: { ...w.from }, to: { ...w.to } }));
+  nextId = s.nextId;
+  selection.clear(); selWire = -1; cancelModes();
+  今の写し = s; 今の印 = 経路の印を作る();
+}
+function 変更を見張る() {
+  if (mode === 'drag' && dragMoved) return;          // ドラッグ中は、離してから１回分
+  const 印 = 経路の印を作る();
+  if (今の印 === null) { 今の印 = 印; 今の写し = 写しを作る(); return; }
+  if (印 === 今の印) { 今の写し = 写しを作る(); return; }   // 0/1 などの変化は、今の写しにだけ入れる
+  戻す山.push(今の写し); if (戻す山.length > 戻せる数) 戻す山.shift();
+  進む山 = []; 今の印 = 印; 今の写し = 写しを作る();
+}
+function 元に戻す() {
+  if (mode === 'drag' && dragMoved) return;
+  変更を見張る();
+  if (!戻す山.length) { setStatus('これ以上は戻せません。'); return; }
+  進む山.push(今の写し); 写しを入れる(戻す山.pop());
+  setStatus(`ひとつ前にもどしました（あと ${戻す山.length} 回戻せます）。`);
+}
+function 進む() {
+  if (mode === 'drag' && dragMoved) return;
+  変更を見張る();
+  if (!進む山.length) { setStatus('これ以上は進めません。'); return; }
+  戻す山.push(今の写し); 写しを入れる(進む山.pop());
+  setStatus(`やり直しました（あと ${進む山.length} 回進めます）。`);
+}
+
+// ---------- 真理値表 ----------
+let 真理値表を開いている = false, 真理値表の印 = null, 表の入力 = [], 表の出力 = [];
+let 表の途中 = [];   // 途中として表に出す出口（'部品id:出力番号'）
+const 途中の記号 = i => i < 26 ? String.fromCharCode(0x24B6 + i) : '(' + (i + 1) + ')';   // Ⓐ Ⓑ …
+function 途中の説明(k) {
+  const [id, p] = k.split(':').map(Number), c = byId(id), T = c && TYPES[c.type];
+  return T ? T.name + (T.outs.length > 1 ? ' の ' + T.outs[p] : ' の出口') : '';
+}
+function 途中を切りかえる(鍵の列) {
+  const 全部ある = 鍵の列.every(k => 表の途中.includes(k));
+  if (全部ある) 表の途中 = 表の途中.filter(k => !鍵の列.includes(k));
+  else 鍵の列.forEach(k => { if (!表の途中.includes(k)) 表の途中.push(k); });
+  真理値表を作る();
+  const 記号 = 鍵の列.map(k => 表の途中.includes(k) ? 途中の記号(表の途中.indexOf(k)) : '').join('');
+  setStatus(全部ある ? '途中の列を表から外しました。'
+    : `${記号}（${鍵の列.map(途中の説明).join('・')}）を真理値表に足しました。もう一度クリックすると外します。`);
+}
+function 部品の途中を切りかえる(c) {
+  const T = TYPES[c.type];
+  if (!T || !T.outs.length || ['IN', 'CLK', 'BTN'].includes(c.type)) return false;
+  途中を切りかえる(T.outs.map((_, i) => c.id + ':' + i));
+  return true;
+}
+const 丸数字 = n => n <= 20 ? String.fromCharCode(0x2460 + n - 1) : '(' + n + ')';
+const 表の上から = (a, b) => a.y - b.y || a.x - b.x;
+function 表の出力の値(o, vals) {
+  if (o.type === 'OUT') return vals.getIn(o, 0) ? 1 : 0;
+  const 重み = o.type === 'SEG4H' ? [16, 32, 64, 128] : [1, 2, 4, 8];
+  return 重み.reduce((s, k, i) => s + (vals.getIn(o, i) ? k : 0), 0);
+}
+function 真理値表を作る() {
+  const 体 = document.getElementById('truthBody');
+  真理値表の印 = 経路の印を作る();
+  表の入力 = comps.filter(c => c.type === 'IN').sort(表の上から);
+  表の出力 = comps.filter(c => ['OUT', 'SEG', 'SEG4', 'SEG4H'].includes(c.type)).sort(表の上から);
+  const 記憶 = comps.some(c => ['DFF', 'CLK', 'BTN'].includes(c.type));
+  const 言う = s => { 体.innerHTML = '<div class="note">' + s + '</div>'; };
+  if (記憶) return 言う('記憶の部品（Dフリップフロップ・クロック・１回ボタン）がある回路は、<br>前の状態で出力が変わるので、真理値表は作りません。');
+  if (!表の入力.length) return 言う('入力スイッチがありません。');
+  表の途中 = 表の途中.filter(k => { const [id, p] = k.split(':').map(Number), c = byId(id); return c && TYPES[c.type] && p < TYPES[c.type].outs.length; });
+  if (!表の出力.length && !表の途中.length) return 言う('出力（ランプ・７セグ）がありません。<br>線やゲートをクリックすると、途中の 0/1 を表にできます。');
+  if (表の入力.length > 8) return 言う(`入力スイッチが ${表の入力.length} 個あります。<br>表が大きくなりすぎるので、8 個（256 行）までにしています。`);
+  const 元の状態 = 表の入力.map(c => c.state);
+  const 元の前回 = typeof 前回の出力 !== 'undefined' ? 前回の出力 : null;
+  const n = 表の入力.length, 行 = [], 途中の行 = [];
+  try {
+    for (let r = 0; r < (1 << n); r++) {
+      表の入力.forEach((c, i) => { c.state = (r >> (n - 1 - i)) & 1; });   // 左（上のスイッチ）が上の位
+      const vals = computeValues();
+      行.push(表の出力.map(o => 表の出力の値(o, vals)));
+      途中の行.push(表の途中.map(k => { const [id, p] = k.split(':').map(Number); return vals.out[id] && vals.out[id][p] ? 1 : 0; }));
+    }
+  } finally {
+    表の入力.forEach((c, i) => { c.state = 元の状態[i]; });
+    if (元の前回 !== null) 前回の出力 = 元の前回;
+  }
+  const 名 = o => ({ OUT: 'ランプ', SEG: '７セグ', SEG4: '７セグ４桁', SEG4H: '７セグ４桁上位' })[o.type];
+  let h = `<div class="note">入力 ${丸数字(1)}〜${丸数字(n)} はスイッチを上から順に。表の番号は回路の横の札と同じです。<br>行をクリックすると、スイッチがその組み合わせになります。<br>回路の<b>線やゲートをクリック</b>すると、その途中の 0/1 も表に出ます（もう一度で外す）。${表の途中.length ? '<span class="clearMid" id="truthClearMid">途中の列を全部外す</span>' : ''}</div>`;
+  h += '<table><thead><tr>' + 表の入力.map((c, i) => `<th class="in">入力${丸数字(i + 1)}</th>`).join('');
+  h += 表の途中.map((k, j) => `<th class="mid${j === 0 ? ' sep' : ''}">途中${途中の記号(j)}<br><small>${途中の説明(k)}</small></th>`).join('');
+  h += 表の出力.map((o, j) => `<th class="out${j === 0 ? ' sep' : ''}">${名(o)}${丸数字(j + 1)}</th>`).join('') + '</tr></thead><tbody>';
+  行.forEach((v, r) => {
+    h += `<tr data-r="${r}">` + 表の入力.map((_, i) => { const b = (r >> (n - 1 - i)) & 1; return `<td class="${b ? 'one' : 'zero'}">${b}</td>`; }).join('');
+    h += 途中の行[r].map((b, j) => `<td class="mid ${b ? 'one' : 'zero'}${j === 0 ? ' sep' : ''}">${b}</td>`).join('');
+    h += v.map((x, j) => {
+      const o = 表の出力[j], 区 = j === 0 ? ' sep' : '';
+      if (o.type === 'OUT') return `<td class="${x ? 'one' : 'zero'}${区}">${x}</td>`;
+      const けた = o.type === 'SEG4H' ? (x >> 4).toString(2).padStart(4, '0') + '0000' : x.toString(2).padStart(4, '0');
+      return `<td class="${区.trim()}">${x} <small>(${けた})</small></td>`;
+    }).join('') + '</tr>';
+  });
+  体.innerHTML = h + '</tbody></table>';
+  const 全部外す = document.getElementById('truthClearMid');
+  if (全部外す) 全部外す.onclick = () => { 表の途中 = []; 真理値表を作る(); setStatus('途中の列を全部外しました。'); };
+  体.querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => {
+    const r = +tr.dataset.r;
+    表の入力.forEach((c, i) => { c.state = (r >> (n - 1 - i)) & 1; });
+    setStatus('スイッチを ' + 表の入力.map(c => c.state).join('') + ' にしました（真理値表の ' + (r + 1) + ' 行目）。');
+  });
+}
+function 真理値表を見張る() {
+  if (!真理値表を開いている) return;
+  if (!(mode === 'drag' && dragMoved) && 経路の印を作る() !== 真理値表の印) 真理値表を作る();
+  // 今のスイッチの行に色をつける
+  if (表の入力.length && 表の入力.length <= 8) {
+    const r = 表の入力.reduce((s, c) => s * 2 + (c.state ? 1 : 0), 0);
+    const 前 = document.querySelector('#truthBody tr.now');
+    if (!前 || +前.dataset.r !== r) {
+      if (前) 前.classList.remove('now');
+      const 今 = document.querySelector(`#truthBody tr[data-r="${r}"]`);
+      if (今) 今.classList.add('now');
+    }
+  }
+}
+// 窓を開いている間、部品の横に表と同じ番号の札を出す
+function 真理値表の札を描く() {
+  if (!真理値表を開いている) return;
+  // 小さく表示しているときも読めるよう、札の大きさは倍率で割る（部品の左上の上に出す）
+  const 拡 = 1 / Math.min(1, 表示倍率);
+  const 札 = (c, 文, 色) => {
+    const T = TYPES[c.type]; if (!T) return;
+    ctx.font = `bold ${Math.round(13 * 拡)}px sans-serif`;
+    const w = ctx.measureText(文).width + 10 * 拡, h = 18 * 拡;
+    const x = c.x, y = c.y - h - 3 >= 0 ? c.y - h - 3 : c.y + T.h + 3;   // 上に場所がなければ下に
+    ctx.fillStyle = 色; roundRect(x, y, w, h, 5 * 拡); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(文, x + w / 2, y + h / 2 + 1);
+    ctx.textBaseline = 'alphabetic';
+  };
+  // 途中として足した線を水色に光らせ、出口に記号の札を出す
+  表の途中.forEach((k, j) => {
+    const [id, p] = k.split(':').map(Number), c = byId(id); if (!c) return;
+    ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = '#3498db'; ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    wires.filter(w => w.from.c === id && w.from.p === p).forEach(w => { 折れ線を描く(線の点(w)); ctx.stroke(); });
+    ctx.restore();
+    const q = pinPos(c, 'out', p), 文 = 途中の記号(j);
+    ctx.font = `bold ${Math.round(13 * 拡)}px sans-serif`;
+    const w = ctx.measureText(文).width + 10 * 拡, h = 18 * 拡, x = q.x + 6 * 拡, y = q.y - h - 4 * 拡;
+    ctx.fillStyle = '#1f618d'; roundRect(x, y, w, h, 5 * 拡); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(文, x + w / 2, y + h / 2 + 1); ctx.textBaseline = 'alphabetic';
+  });
+  表の入力.forEach((c, i) => 札(c, '入力' + 丸数字(i + 1), '#1e8449'));
+  表の出力.forEach((o, j) => 札(o, '出力' + 丸数字(j + 1), '#a04000'));
+  ctx.textAlign = 'center';
+}
+function 真理値表を開く(開く) {
+  真理値表を開いている = 開く;
+  document.getElementById('truthPanel').hidden = !開く;
+  if (開く) { 真理値表を作る(); setStatus('真理値表を出しました。回路の横の札の番号が、表の列の番号です。線やゲートをクリックすると、途中の 0/1 も表に出ます。'); }
+}
+
+function draw() {
+  変更を見張る();
+  document.getElementById('btnUndo').disabled = !戻す山.length;
+  document.getElementById('btnRedo').disabled = !進む山.length;
+  世界の大きさをそろえる();
+  ctx.setTransform(表示倍率, 0, 0, 表示倍率, 0, 0);
+  ctx.clearRect(0, 0, 世界の幅, 世界の高さ);
+  // grid（見えている所だけ点を打つ。小さく表示しているときは間を広げる）
+  ctx.fillStyle = '#d5dbdb';
+  const 目 = 表示倍率 < 0.5 ? 40 : 20, 窓 = document.getElementById('canvasWrap');
+  const gx0 = Math.max(目, Math.floor(窓.scrollLeft / 表示倍率 / 目) * 目), gx1 = Math.min(世界の幅, (窓.scrollLeft + 窓.clientWidth) / 表示倍率 + 目);
+  const gy0 = Math.max(目, Math.floor(窓.scrollTop / 表示倍率 / 目) * 目), gy1 = Math.min(世界の高さ, (窓.scrollTop + 窓.clientHeight) / 表示倍率 + 目);
+  for (let gx = gx0; gx < gx1; gx += 目)
+    for (let gy = gy0; gy < gy1; gy += 目)
+      ctx.fillRect(gx - 0.5, gy - 0.5, 1.5, 1.5);
+
+  const vals = computeValues();
+
+  // wires
+  経路をそろえる();
+  wires.forEach((w, idx) => {
+    const on = !!vals.out[w.from.c][w.from.p];
+    折れ線を描く(線の点(w));
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    if (idx === selWire) { ctx.lineWidth = 6; ctx.strokeStyle = '#e67e22'; ctx.stroke(); return; }
+    if (線の色の方式 === '線ごと') {
+      ctx.strokeStyle = 線のかたまりの色(w.from.c, w.from.p);
+      ctx.globalAlpha = on ? 1 : 0.45; ctx.lineWidth = on ? 4.5 : 2.5;
+      ctx.stroke(); ctx.globalAlpha = 1;
+    } else {
+      ctx.lineWidth = 3; ctx.strokeStyle = on ? '#e74c3c' : '#95a5a6'; ctx.stroke();
+    }
+  });
+
+  分岐点.forEach(d => {
+    const on = vals.out[d.c] && vals.out[d.c][d.p];
+    ctx.beginPath(); ctx.arc(d.x, d.y, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = 線の色の方式 === '線ごと' ? 線のかたまりの色(d.c, d.p) : (on ? '#e74c3c' : '#7f8c8d'); ctx.fill();
+  });
+
+  // wire being drawn
+  if (mode === 'wire' && wireStart) {
+    const c = byId(wireStart.c);
+    const p = pinPos(c, wireStart.kind, wireStart.p);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(mouse.x, mouse.y);
+    ctx.lineWidth = 2; ctx.strokeStyle = '#3498db'; ctx.setLineDash([6, 4]);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  comps.forEach(c => drawComp(c, vals, false));
+
+  // placement ghost
+  if (mode === 'place' && placeType) {
+    const t = TYPES[placeType];
+    drawComp({ id: -1, type: placeType, x: snap(mouse.x - t.w / 2), y: snap(mouse.y - t.h / 2), state: 0 }, null, true);
+  }
+  // paste ghost
+  if (mode === 'paste' && clipboard) {
+    const ox = snap(mouse.x - clipboard.bw / 2), oy = snap(mouse.y - clipboard.bh / 2);
+    clipboard.parts.forEach(p =>
+      drawComp({ id: -1, type: p.type, x: ox + p.dx, y: oy + p.dy, state: p.state }, null, true));
+  }
+  // rubber band
+  if (mode === 'band' && bandStart) {
+    ctx.strokeStyle = '#3498db'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.fillStyle = 'rgba(52,152,219,0.08)';
+    const rx = Math.min(bandStart.x, mouse.x), ry = Math.min(bandStart.y, mouse.y);
+    const rw = Math.abs(mouse.x - bandStart.x), rh = Math.abs(mouse.y - bandStart.y);
+    ctx.fillRect(rx, ry, rw, rh); ctx.strokeRect(rx, ry, rw, rh);
+    ctx.setLineDash([]);
+  }
+  真理値表の札を描く();
+  真理値表を見張る();
+  requestAnimationFrame(draw);
+}
+
+// ---------- hit testing ----------
+function hitPin(x, y) {
+  for (const c of comps) {
+    const t = TYPES[c.type];
+    for (let i = 0; i < t.outs.length; i++) {
+      const p = pinPos(c, 'out', i);
+      if ((p.x - x) ** 2 + (p.y - y) ** 2 < 81) return { c: c.id, kind: 'out', p: i };
+    }
+    for (let i = 0; i < t.ins.length; i++) {
+      const p = pinPos(c, 'in', i);
+      if ((p.x - x) ** 2 + (p.y - y) ** 2 < 81) return { c: c.id, kind: 'in', p: i };
+    }
+  }
+  return null;
+}
+function hitComp(x, y) {
+  for (let i = comps.length - 1; i >= 0; i--) {
+    const c = comps[i], t = TYPES[c.type];
+    if (x >= c.x && x <= c.x + t.w && y >= c.y && y <= c.y + t.h) return c;
+  }
+  return null;
+}
+function hitWire(x, y) {
+  for (let i = wires.length - 1; i >= 0; i--) {
+    if (線までの距離2(x, y, 線の点(wires[i])) < 49) return i;
+  }
+  return -1;
+}
+
+// ---------- actions ----------
+function connectPins(p1, p2) {
+  const o = p1.kind === 'out' ? p1 : p2;
+  const i = p1.kind === 'in' ? p1 : p2;
+  wires = wires.filter(w => !(w.to.c === i.c && w.to.p === i.p));
+  wires.push({ from: { c: o.c, p: o.p }, to: { c: i.c, p: i.p } });
+  setStatus('配線しました。');
+}
+
+// 配線開始した〇から大きく動いたか(クリックとドラッグの判別)
+function dragMovedFrom(x, y) {
+  if (!wireStart) return true;
+  const c = byId(wireStart.c);
+  if (!c) return true;
+  const p = pinPos(c, wireStart.kind, wireStart.p);
+  return (p.x - x) ** 2 + (p.y - y) ** 2 > 144; // 12px超はドラッグ扱い
+}
+
+function addComp(type, x, y) {
+  const t = TYPES[type];
+  comps.push({ id: nextId++, type, x: snap(x - t.w / 2), y: snap(y - t.h / 2), state: 0 });
+}
+
+function copySelection() {
+  if (selection.size === 0) { setStatus('先にコピーしたい範囲をマウスで囲んで選択してください。'); return; }
+  const sel = comps.filter(c => selection.has(c.id));
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  sel.forEach(c => {
+    const t = TYPES[c.type];
+    minx = Math.min(minx, c.x); miny = Math.min(miny, c.y);
+    maxx = Math.max(maxx, c.x + t.w); maxy = Math.max(maxy, c.y + t.h);
+  });
+  const idx = new Map(sel.map((c, i) => [c.id, i]));
+  clipboard = {
+    bw: maxx - minx, bh: maxy - miny,
+    parts: sel.map(c => ({ type: c.type, dx: c.x - minx, dy: c.y - miny, state: c.state })),
+    wires: wires.filter(w => idx.has(w.from.c) && idx.has(w.to.c))
+      .map(w => ({ fi: idx.get(w.from.c), fp: w.from.p, ti: idx.get(w.to.c), tp: w.to.p }))
+  };
+  mode = 'paste';
+  setStatus(`${sel.length} 個の部品をコピーしました。クリックで配置(連続配置可)、右クリック / Esc で終了。`);
+}
+
+function pasteAt(x, y) {
+  const ox = snap(x - clipboard.bw / 2), oy = snap(y - clipboard.bh / 2);
+  const newIds = clipboard.parts.map(p => {
+    const id = nextId++;
+    comps.push({ id, type: p.type, x: ox + p.dx, y: oy + p.dy, state: p.state });
+    return id;
+  });
+  clipboard.wires.forEach(w =>
+    wires.push({ from: { c: newIds[w.fi], p: w.fp }, to: { c: newIds[w.ti], p: w.tp } }));
+  selection = new Set(newIds);
+}
+
+function deleteSelection() {
+  if (selWire >= 0) { wires.splice(selWire, 1); selWire = -1; }
+  if (selection.size > 0) {
+    comps = comps.filter(c => !selection.has(c.id));
+    wires = wires.filter(w => !selection.has(w.from.c) && !selection.has(w.to.c));
+    selection.clear();
+  }
+  setStatus('削除しました。');
+}
+
+function cancelModes() {
+  mode = 'idle'; placeType = null; wireStart = null; bandStart = null;
+  document.querySelectorAll('#palette .part').forEach(el => el.classList.remove('active'));
+}
+
+// ---------- save / load ----------
+function saveCircuit() {
+  const data = JSON.stringify({ app: 'logic-sim', version: 1, comps, wires }, null, 1);
+  const blob = new Blob([data], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const d = new Date();
+  a.download = `回路_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus('テキストファイルとして保存しました(ダウンロードフォルダをご確認ください)。');
+}
+
+function loadCircuit(text) {
+  try {
+    const data = JSON.parse(text);
+    if (!Array.isArray(data.comps) || !Array.isArray(data.wires)) throw new Error('形式が違います');
+    const 外した数 = data.comps.filter(c => c.type === 'SEG2').length;   // ７セグ２桁は使えなくなった
+    data.comps = data.comps.filter(c => c.type !== 'SEG2');
+    data.comps.forEach(c => { if (!TYPES[c.type]) throw new Error('未知の部品: ' + c.type); });
+    comps = data.comps.map(c => ({ id: c.id, type: c.type, x: c.x, y: c.y,
+      state: c.type === 'SEG4' || c.type === 'SEG4H' ? Math.max(0, Math.min(2, c.state | 0)) : (c.state ? 1 : 0) }));
+    const ids = new Set(comps.map(c => c.id));
+    wires = data.wires.filter(w => ids.has(w.from.c) && ids.has(w.to.c));
+    nextId = comps.reduce((m, c) => Math.max(m, c.id), 0) + 1;
+    selection.clear(); selWire = -1; cancelModes();
+    setStatus(`読み込みました(部品 ${comps.length} 個、配線 ${wires.length} 本)。続きから編集できます。` +
+      (外した数 ? `（「７セグ２桁」は使えなくなったので ${外した数} 個外しました。７セグか７セグ４桁につなぎ直してください）` : ''));
+  } catch (e) {
+    alert('読み込みに失敗しました: ' + e.message);
+  }
+}
+
+// ---------- events ----------
+document.querySelectorAll('#palette .part').forEach(el => {
+  el.addEventListener('click', () => {
+    cancelModes();
+    mode = 'place'; placeType = el.dataset.type;
+    el.classList.add('active');
+    setStatus(`「${TYPES[placeType].name}」を配置します。クリックで配置(連続可)、右クリック / Esc で終了。`);
+  });
+});
+
+cv.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const x = e.offsetX / 表示倍率, y = e.offsetY / 表示倍率;
+  mouse = { x, y };
+
+  if (mode === 'place') { addComp(placeType, x, y); return; }
+  if (mode === 'paste') { pasteAt(x, y); return; }
+
+  // 配線待ち(クリック式): 2つ目の〇をクリックでつなぐ
+  if (mode === 'wire' && wireStart) {
+    const pin2 = hitPin(x, y);
+    if (pin2 && pin2.kind !== wireStart.kind) {
+      connectPins(wireStart, pin2);
+      mode = 'idle'; wireStart = null;
+    } else if (pin2 && !(pin2.c === wireStart.c && pin2.kind === wireStart.kind && pin2.p === wireStart.p)) {
+      wireStart = pin2;
+      setStatus('つなぎ先を変更しました。相手の端子(〇)をクリックしてください。');
+    } else {
+      mode = 'idle'; wireStart = null;
+      setStatus('配線を中止しました。');
+    }
+    return;
+  }
+
+  const pin = hitPin(x, y);
+  if (pin) {
+    if (pin.kind === 'in') {
+      // detach existing wire on this input if any
+      const i = wires.findIndex(w => w.to.c === pin.c && w.to.p === pin.p);
+      if (i >= 0) wires.splice(i, 1);
+    }
+    mode = 'wire'; wireStart = pin;
+    setStatus('つなぎたい相手の端子(〇)をクリックしてください(ドラッグでもつなげます)。');
+    return;
+  }
+
+  const comp = hitComp(x, y);
+  if (comp) {
+    selWire = -1;
+    if (!selection.has(comp.id)) {
+      if (!e.shiftKey) selection.clear();
+      selection.add(comp.id);
+    }
+    mode = 'drag'; dragMoved = false; dragStart = { x, y };
+    dragOffsets = new Map();
+    comps.filter(c => selection.has(c.id)).forEach(c => dragOffsets.set(c.id, { dx: c.x - x, dy: c.y - y }));
+    return;
+  }
+
+  const wi = hitWire(x, y);
+  if (wi >= 0) {
+    selection.clear(); selWire = wi;
+    setStatus('配線を選択しました。Del キーで削除できます。');
+    if (真理値表を開いている) 途中を切りかえる([wires[wi].from.c + ':' + wires[wi].from.p]);
+    return;
+  }
+
+  selection.clear(); selWire = -1;
+  mode = 'band'; bandStart = { x, y };
+});
+
+cv.addEventListener('mousemove', e => {
+  mouse = { x: e.offsetX / 表示倍率, y: e.offsetY / 表示倍率 };
+  if (mode === 'drag') {
+    if (Math.abs(mouse.x - dragStart.x) + Math.abs(mouse.y - dragStart.y) > 4) dragMoved = true;
+    if (dragMoved) {
+      dragOffsets.forEach((off, id) => {
+        const c = byId(id);
+        if (c) { c.x = snap(mouse.x + off.dx); c.y = snap(mouse.y + off.dy); }
+      });
+    }
+  }
+});
+
+cv.addEventListener('mouseup', e => {
+  const x = e.offsetX / 表示倍率, y = e.offsetY / 表示倍率;
+  if (mode === 'wire') {
+    const pin = hitPin(x, y);
+    // 開始した〇の上で離した(=クリック) → クリック式配線モードを続行
+    if (pin && pin.c === wireStart.c && pin.kind === wireStart.kind && pin.p === wireStart.p) {
+      return;
+    }
+    if (pin && pin.kind !== wireStart.kind) {
+      connectPins(wireStart, pin);
+    } else if (pin || dragMovedFrom(x, y)) {
+      setStatus('配線を中止しました。出力(右の丸)と入力(左の丸)をつなぎます。');
+    } else {
+      return; // わずかなブレはクリック扱いで続行
+    }
+    mode = 'idle'; wireStart = null;
+    return;
+  }
+  if (mode === 'drag') {
+    if (!dragMoved) {
+      const comp = hitComp(x, y);
+      if (comp && comp.type === 'IN') comp.state = comp.state ? 0 : 1;
+      if (comp && 真理値表を開いている) 部品の途中を切りかえる(comp);
+      if (comp && (comp.type === 'SEG4' || comp.type === 'SEG4H')) {
+        const i = セグ4のボタン(comp).findIndex(r => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+        if (i >= 0) { comp.state = i; setStatus(['2進', '10進', '16進'][i] + 'で表示します。'); }
+      }
+    }
+    mode = 'idle';
+    return;
+  }
+  if (mode === 'band') {
+    const rx1 = Math.min(bandStart.x, x), ry1 = Math.min(bandStart.y, y);
+    const rx2 = Math.max(bandStart.x, x), ry2 = Math.max(bandStart.y, y);
+    comps.forEach(c => {
+      const t = TYPES[c.type];
+      if (c.x < rx2 && c.x + t.w > rx1 && c.y < ry2 && c.y + t.h > ry1) selection.add(c.id);
+    });
+    mode = 'idle'; bandStart = null;
+    if (selection.size > 0)
+      setStatus(`${selection.size} 個選択中。「コピー配置」(Ctrl+C) で複製、Del で削除、ドラッグで移動できます。`);
+  }
+});
+
+cv.addEventListener('contextmenu', e => { e.preventDefault(); cancelModes(); setStatus('操作を終了しました。'); });
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Escape') { cancelModes(); setStatus('操作を終了しました。'); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelection(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+    e.preventDefault();
+    if (clipboard) { mode = 'paste'; setStatus('クリックで貼り付けます。右クリック / Esc で終了。'); }
+  }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveCircuit(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault(); selection = new Set(comps.map(c => c.id));
+    setStatus(`全 ${selection.size} 個を選択しました。`);
+  }
+});
+
+document.getElementById('btnSave').onclick = saveCircuit;
+document.getElementById('btnLoad').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => loadCircuit(r.result);
+  r.readAsText(f);
+  e.target.value = '';
+});
+document.getElementById('btnCopy').onclick = copySelection;
+document.getElementById('btnDelete').onclick = deleteSelection;
+document.getElementById('btnClear').onclick = () => {
+  if (comps.length && confirm('すべての部品と配線を消去しますか?')) {
+    comps = []; wires = []; selection.clear(); selWire = -1;
+    setStatus('全消去しました。');
+  }
+};
+document.getElementById('btnColor').onclick = 線の色を切りかえる;
+document.getElementById('btnZoomOut').onclick = () => 一段かえる(-1);
+document.getElementById('btnZoomIn').onclick = () => 一段かえる(1);
+document.getElementById('btnZoom100').onclick = () => { 表示倍率を変える(1); setStatus('表示の大きさを 100% にもどしました。'); };
+document.getElementById('btnZoomFit').onclick = 全体を見せる;
+document.getElementById('canvasWrap').addEventListener('wheel', e => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const r = e.currentTarget.getBoundingClientRect(), d = Math.max(-100, Math.min(100, e.deltaY));
+  表示倍率を変える(表示倍率 * Math.exp(-d * 0.0025), { sx: e.clientX - r.left, sy: e.clientY - r.top });
+}, { passive: false });
+(() => { let z = 1; try { z = parseFloat(localStorage.getItem('logicsim-倍率')) || 1; } catch (e) { } if (z !== 1) 表示倍率を変える(z); })();
+document.getElementById('btnUndo').onclick = 元に戻す;
+document.getElementById('btnRedo').onclick = 進む;
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); 元に戻す(); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); 進む(); }
+});
+document.getElementById('btnTruth').onclick = () => 真理値表を開く(!真理値表を開いている);
+document.getElementById('truthClose').onclick = () => 真理値表を開く(false);
+(() => {
+  const 窓 = document.getElementById('truthPanel'), 頭 = 窓.querySelector('.tpHead');
+  let 掴み = null;
+  頭.addEventListener('mousedown', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    const r = 窓.getBoundingClientRect(); 掴み = { dx: e.clientX - r.left, dy: e.clientY - r.top }; e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!掴み) return;
+    窓.style.left = Math.max(0, Math.min(innerWidth - 80, e.clientX - 掴み.dx)) + 'px';
+    窓.style.top = Math.max(0, Math.min(innerHeight - 40, e.clientY - 掴み.dy)) + 'px';
+    窓.style.right = 'auto';
+  });
+  document.addEventListener('mouseup', () => { 掴み = null; });
+})();
+document.getElementById('btnHelp').onclick = () => {
+  const p = document.getElementById('helpPanel');
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+};
+
+// =====================================================================
+//  授業モード
+//   生徒：［先生に送る］で 組・番号・合言葉・課題 を入れると、
+//         回路が変わるたびに（20 秒ごとに見て）先生のスプレッドシートへ送る。
+//   先生：このページを「#先生=鍵」をつけて開くと、クラス全員の回路の一覧になる。
+//         縮小図・最終更新・自動判定（課題の全パターンを入れて答え合わせ）を表示する。
+//   提出先URL が空なら、授業モードのボタンは出ない（ふつうのシミュレータのまま）。
+// =====================================================================
+// 提出先：Google Apps Script のウェブアプリの URL。
+//   GitHub に置くときは config.js の中に書く（このファイルは書きかえなくてよい）。
+const 提出先URL = String(window.授業の提出先 || '').trim();
+const 送る間隔 = 20000;         // 生徒側：変化を見る間隔（ミリ秒）
+const 一覧の更新間隔 = 15000;   // 先生側：一覧を取りに行く間隔（ミリ秒）
+
+// ---------------- 課題（自動判定）----------------
+// 入力スイッチは「上から順」に並べたものとして判定する（見本回路と同じ並び）。
+//   加算・乗算 … A0, B0, A1, B1, …（同じ位の A と B がとなり）
+const ビット値 = (v, 先頭, n) => { let s = 0; for (let i = 0; i < n; i++) s += v[先頭 + 2 * i] << i; return s; };
+const 課題一覧 = [
+  { 名: '半加算器（1ビット＋1ビット）', 数: 2, 式: v => v[0] + v[1], 例: v => `${v[0]}＋${v[1]}` },
+  { 名: '全加算器（1＋1＋1 まで）', 数: 3, 式: v => v[0] + v[1] + v[2], 例: v => `${v[0]}＋${v[1]}＋${v[2]}` },
+  { 名: '2ビット加算', 数: 4, 式: v => ビット値(v, 0, 2) + ビット値(v, 1, 2), 例: v => `${ビット値(v, 0, 2)}＋${ビット値(v, 1, 2)}` },
+  { 名: '3ビット加算', 数: 6, 式: v => ビット値(v, 0, 3) + ビット値(v, 1, 3), 例: v => `${ビット値(v, 0, 3)}＋${ビット値(v, 1, 3)}` },
+  { 名: '4ビット加算', 数: 8, 式: v => ビット値(v, 0, 4) + ビット値(v, 1, 4), 例: v => `${ビット値(v, 0, 4)}＋${ビット値(v, 1, 4)}` },
+  { 名: '1ビット×1ビット', 数: 2, 式: v => v[0] * v[1], 例: v => `${v[0]}×${v[1]}` },
+  { 名: '2ビット×2ビット', 数: 4, 式: v => ビット値(v, 0, 2) * ビット値(v, 1, 2), 例: v => `${ビット値(v, 0, 2)}×${ビット値(v, 1, 2)}` },
+  { 名: 'セレクタ（上から X・M・Y）', 数: 3, 式: v => v[1] ? v[2] : v[0], 例: v => `X=${v[0]} M=${v[1]} Y=${v[2]}` },
+  { 名: '命令で切替（上から M・A0・B0・A1・B1）', 数: 5,
+    式: v => { const a = v[1] + 2 * v[3], b = v[2] + 2 * v[4]; return v[0] ? a * b : a + b; },
+    例: v => { const a = v[1] + 2 * v[3], b = v[2] + 2 * v[4]; return `命令${v[0]}：${a}${v[0] ? '×' : '＋'}${b}`; } },
+];
+const 自由課題 = '自由（判定しない）';
+
+// 生徒が入れた文字を画面に出すときは必ずこれを通す（タグとして働かないように）
+const 文字だけ = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+function 保存用の文字列() {
+  const 部品 = comps.map(c => ({ id: c.id, type: c.type, x: c.x, y: c.y, state: c.state }));
+  return JSON.stringify({ app: 'logic-sim', version: 1, comps: 部品, wires });
+}
+
+// ---------------- よその回路を一時的に借りて計算・描画する ----------------
+function 回路を借りて(データ, 処理) {
+  const 元 = { comps, wires, selection, selWire, 経路表, 経路の印, 分岐点 };
+  const 前値 = typeof 前回の出力 !== 'undefined' ? 前回の出力 : null;
+  try {
+    if (!データ || !Array.isArray(データ.comps)) throw new Error('回路の形式がちがう');
+    データ.comps.forEach(c => { if (!TYPES[c.type]) throw new Error('知らない部品 ' + c.type); });
+    comps = データ.comps.map(c => ({ id: c.id, type: c.type, x: +c.x || 0, y: +c.y || 0, state: c.state | 0 }));
+    const ids = new Set(comps.map(c => c.id));
+    wires = (Array.isArray(データ.wires) ? データ.wires : []).filter(w => w && w.from && w.to && ids.has(w.from.c) && ids.has(w.to.c)
+      && w.from.p < TYPES[comps.find(c => c.id === w.from.c).type].outs.length
+      && w.to.p < TYPES[comps.find(c => c.id === w.to.c).type].ins.length);
+    selection = new Set(); selWire = -1;
+    経路表 = new Map(); 経路の印 = ''; 分岐点 = [];
+    if (前値 !== null) 前回の出力 = {};
+    return 処理();
+  } finally {
+    comps = 元.comps; wires = 元.wires; selection = 元.selection; selWire = 元.selWire;
+    経路表 = 元.経路表; 経路の印 = 元.経路の印; 分岐点 = 元.分岐点;
+    if (前値 !== null) 前回の出力 = 前値;
+  }
+}
+
+const 上から = (a, b) => a.y - b.y || a.x - b.x;
+// 出力の読み方：７セグ（いちばん上のもの）があればその値。
+//               ７セグ４桁（上位）があれば 16・32・64・128 の位として足す。なければランプが 16 の位から上。
+//               ７セグがなければ、ランプを上から大きい位として読む（C・S なら 2C＋S）。
+function 出力の値(vals) {
+  const 表示 = comps.filter(c => c.type === 'SEG' || c.type === 'SEG4').sort(上から);
+  const 上位 = comps.filter(c => c.type === 'SEG4H').sort(上から);
+  const ランプ = comps.filter(c => c.type === 'OUT').sort(上から);
+  if (表示.length || 上位.length) {
+    let n = 0;
+    if (表示.length) [1, 2, 4, 8].forEach((k, i) => { if (vals.getIn(表示[0], i)) n += k; });
+    if (上位.length) [16, 32, 64, 128].forEach((k, i) => { if (vals.getIn(上位[0], i)) n += k; });
+    else ランプ.forEach((l, i) => { if (vals.getIn(l, 0)) n += 16 << i; });
+    return n;
+  }
+  let n = 0;
+  ランプ.forEach(l => { n = n * 2 + (vals.getIn(l, 0) ? 1 : 0); });
+  return n;
+}
+function* 並べかえ(列) {
+  if (列.length <= 1) { yield 列.slice(); return; }
+  for (let i = 0; i < 列.length; i++) {
+    const 残 = 列.slice(0, i).concat(列.slice(i + 1));
+    for (const p of 並べかえ(残)) yield [列[i], ...p];
+  }
+}
+function 判定する(データ, 課題) {
+  if (!課題) return { 印: '', 文: '判定なし' };
+  return 回路を借りて(データ, () => {
+    if (!comps.some(c => c.type === 'OUT' || c.type === 'SEG' || c.type === 'SEG4' || c.type === 'SEG4H'))
+      return { 印: '－', 文: '出力（ランプ・７セグ）がまだない' };
+    const 入 = comps.filter(c => c.type === 'IN').sort(上から);
+    if (入.length !== 課題.数) return { 印: '－', 文: `スイッチ ${入.length} 個（${課題.数} 個のはず）` };
+    const N = 1 << 課題.数;
+    const 試す = 順 => {
+      let 合 = 0, 最初のちがい = null;
+      for (let k = 0; k < N; k++) {
+        const v = Array.from({ length: 課題.数 }, (_, i) => (k >> i) & 1);
+        順.forEach((c, i) => { c.state = v[i]; });
+        if (typeof 前回の出力 !== 'undefined') { computeValues(); computeValues(); }
+        const 値 = 出力の値(computeValues()), 正 = 課題.式(v);
+        if (値 === 正) 合++;
+        else if (!最初のちがい) 最初のちがい = `${課題.例(v)} が ${値}（正しくは ${正}）`;
+      }
+      return { 合, 最初のちがい };
+    };
+    const 結果 = 試す(入);
+    if (結果.合 === N) return { 印: '✓', 文: `${N}通りすべて正解` };
+    if (課題.数 <= 5) {
+      for (const 順 of 並べかえ(入)) {
+        if (試す(順).合 === N) return { 印: '✓', 文: '正解（スイッチの並びが見本とちがう）' };
+      }
+    }
+    return { 印: '△', 文: `${N}通り中 ${結果.合}通り正解。例：${結果.最初のちがい}` };
+  });
+}
+
+// 回路をキャンバスに縮小して描く
+function 回路を描く(先, データ, 最大倍率 = 1) {
+  回路を借りて(データ, () => {
+    const g = 先.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 先.width, 先.height);
+    if (!comps.length) {
+      g.fillStyle = '#95a5a6'; g.font = '14px sans-serif'; g.textAlign = 'center';
+      g.fillText('（まだ何も置いていない）', 先.width / 2, 先.height / 2); return;
+    }
+    全部の経路を作る();
+    if (typeof 前回の出力 !== 'undefined') computeValues();
+    const vals = computeValues();
+    let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+    comps.forEach(c => { const t = TYPES[c.type]; x1 = Math.min(x1, c.x); y1 = Math.min(y1, c.y); x2 = Math.max(x2, c.x + t.w); y2 = Math.max(y2, c.y + t.h); });
+    wires.forEach(w => 線の点(w).forEach(p => { x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y); x2 = Math.max(x2, p.x); y2 = Math.max(y2, p.y); }));
+    const 余 = 16, 倍 = Math.min(最大倍率, 先.width / (x2 - x1 + 余 * 2), 先.height / (y2 - y1 + 余 * 2));
+    const ox = (先.width - (x2 - x1) * 倍) / 2 - x1 * 倍, oy = (先.height - (y2 - y1) * 倍) / 2 - y1 * 倍;
+    const 元ctx = ctx;
+    ctx = g;
+    // 縮小図はいつもの色（0/1）で描く（先生が線ごとの色にしていても、線とスイッチの色がそろうように）
+    const 元の方式 = typeof 線の色の方式 !== 'undefined' ? 線の色の方式 : null;
+    if (元の方式 !== null) 線の色の方式 = '01';
+    try {
+      g.setTransform(倍, 0, 0, 倍, ox, oy);
+      wires.forEach(w => {
+        const on = !!vals.out[w.from.c][w.from.p];
+        折れ線を描く(線の点(w));
+        g.lineWidth = 3; g.strokeStyle = on ? '#e74c3c' : '#95a5a6';
+        g.lineJoin = 'round'; g.lineCap = 'round'; g.stroke();
+      });
+      分岐点.forEach(d => {
+        const on = vals.out[d.c] && vals.out[d.c][d.p];
+        g.beginPath(); g.arc(d.x, d.y, 4.5, 0, Math.PI * 2); g.fillStyle = on ? '#e74c3c' : '#7f8c8d'; g.fill();
+      });
+      comps.forEach(c => drawComp(c, vals, false));
+    } finally {
+      ctx = 元ctx;
+      if (元の方式 !== null) 線の色の方式 = 元の方式;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+    }
+  });
+}
+
+// ---------------- 通信 ----------------
+async function 送受信(方法, 中身, 付け足し = '') {
+  const 応答 = await fetch(提出先URL + 付け足し, 方法 === 'POST'
+    ? { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(中身) }
+    : { method: 'GET' });
+  if (!応答.ok) throw new Error('通信エラー ' + 応答.status);
+  const j = await 応答.json();
+  if (!j.ok) throw new Error(j.理由 || 'うまくいきませんでした');
+  return j;
+}
+function 保管(名, 値) { try { if (値 === undefined) return JSON.parse(localStorage.getItem(名) || 'null'); localStorage.setItem(名, JSON.stringify(値)); } catch (e) { return null; } }
+
+// ---------------- 生徒の画面 ----------------
+let 授業 = null;            // { 組, 番号, 合言葉, 課題 }
+let 最後に送った印 = '';
+let 送信中 = false;
+
+function 授業ボタンを用意() {
+  const 棚 = document.getElementById('toolbar');
+  const b = document.createElement('button');
+  b.id = 'btnClass'; b.className = 'class';
+  b.title = '先生に送る — 組・番号を入れると、回路を先生の画面に送ります';
+  b.innerHTML = '<span id="classDot"></span><span id="classLabel">先生に送る</span>';
+  棚.insertBefore(b, document.getElementById('btnHelp'));
+  b.onclick = 授業の画面を開く;
+  const 前 = 保管('logicsim-授業');
+  if (前 && 前.組 && 前.番号) { 授業 = 前; 授業の表示(); }   // 合言葉も覚えているので、そのまま続きから送る
+  // うっかり読み込み直しても、作りかけの回路を取りもどす（この端末の中だけに置いてある）
+  const 途中 = 保管('logicsim-途中');
+  if (授業 && 途中 && !comps.length) {
+    loadCircuit(途中);
+    setStatus('前の続きを開きました。そのまま続けてください。');
+  }
+  const q = new URLSearchParams(location.search).get('課題');
+  if (q && 授業) 授業.課題 = q;
+  setInterval(() => { if (授業) 送ってみる(false); }, 送る間隔);
+  if (授業) setTimeout(() => 送ってみる(true), 1500);
+}
+function 授業の表示(状態 = '待ち', 文 = '') {
+  const 点 = document.getElementById('classDot'), 札 = document.getElementById('classLabel');
+  if (!点) return;
+  点.className = 'dot ' + (授業 ? 状態 : '');
+  札.textContent = 授業 ? `${授業.組} ${授業.番号}番` : '先生に送る';
+  if (文) setStatus(文);
+}
+function 授業の画面を開く() {
+  const 既 = document.getElementById('classDialog'); if (既) 既.remove();
+  const 課題名 = new URLSearchParams(location.search).get('課題');
+  const d = document.createElement('div');
+  d.id = 'classDialog';
+  const 選 = [自由課題, ...課題一覧.map(k => k.名)];
+  d.innerHTML = `
+    <div class="box">
+      <h2>先生に送る</h2>
+      <p>入れておくと、回路が変わるたびに先生の画面へ送られます（${送る間隔 / 1000}秒ごとに確認）。</p>
+      <label>組<input id="cdKumi" placeholder="例：1年3組" maxlength="12"></label>
+      <label>番号<input id="cdBan" type="number" min="1" max="60"></label>
+      <label>合言葉<input id="cdKey" placeholder="先生が黒板に書いたもの" maxlength="30"></label>
+      <label>課題<select id="cdKadai">${選.map(n => `<option>${n}</option>`).join('')}</select></label>
+      <div class="row">
+        <button id="cdStart" class="green">はじめる</button>
+        ${授業 ? '<button id="cdStop" class="warn">送るのをやめる</button>' : ''}
+        <button id="cdClose">とじる</button>
+      </div>
+      <p id="cdMsg" class="msg"></p>
+    </div>`;
+  document.body.appendChild(d);
+  const 前 = 授業 || 保管('logicsim-授業') || {};
+  d.querySelector('#cdKumi').value = 前.組 || '';
+  d.querySelector('#cdBan').value = 前.番号 || '';
+  d.querySelector('#cdKey').value = 前.合言葉 || '';
+  d.querySelector('#cdKadai').value = 課題名 || 前.課題 || 自由課題;
+  d.querySelector('#cdClose').onclick = () => d.remove();
+  if (授業) d.querySelector('#cdStop').onclick = () => {
+    授業 = null; 保管('logicsim-授業', null); 保管('logicsim-途中', null); 授業の表示(); d.remove(); setStatus('先生に送るのをやめました。');
+  };
+  d.querySelector('#cdStart').onclick = async () => {
+    const 組 = d.querySelector('#cdKumi').value.trim(), 番号 = parseInt(d.querySelector('#cdBan').value, 10);
+    const 合言葉 = d.querySelector('#cdKey').value.trim(), 課題 = d.querySelector('#cdKadai').value;
+    const 文 = d.querySelector('#cdMsg');
+    if (!組 || !(番号 >= 1 && 番号 <= 60) || !合言葉) { 文.textContent = '組・番号・合言葉を入れてください。'; return; }
+    授業 = { 組, 番号, 合言葉, 課題 };
+    最後に送った印 = '';
+    文.textContent = '送っています…';
+    const ok = await 送ってみる(true);
+    if (ok) { 保管('logicsim-授業', 授業); d.remove(); }
+    else { 文.textContent = '送れませんでした：' + (document.getElementById('status').textContent || ''); 授業 = null; 授業の表示(); }
+  };
+}
+async function 送ってみる(必ず) {
+  if (!授業 || 送信中) return false;
+  const 文字列 = 保存用の文字列();
+  if (!comps.length) {                       // 何も置いていないときは回路を送らない（前に送った回路を消さない）
+    if (!必ず) return true;
+    try { await 送受信('POST', { 組: 授業.組, 番号: 授業.番号, 合言葉: 授業.合言葉, 確認だけ: true }); 授業の表示('済', '先生とつながりました。回路を置くと送られます。'); return true; }
+    catch (e) { 授業の表示('失敗', '先生に送れませんでした：' + e.message); return false; }
+  }
+  保管('logicsim-途中', 文字列);
+  if (!必ず && 文字列 === 最後に送った印) return true;
+  送信中 = true; 授業の表示('送信');
+  try {
+    const j = await 送受信('POST', { 組: 授業.組, 番号: 授業.番号, 合言葉: 授業.合言葉, 課題: 授業.課題, 回路: 文字列 });
+    最後に送った印 = 文字列;
+    授業の表示('済', `先生に送りました（${new Date().toLocaleTimeString('ja-JP')}）。このまま続けてください。`);
+    return true;
+  } catch (e) {
+    授業の表示('失敗', '先生に送れませんでした：' + e.message + '（しばらくしてもう一度送ります）');
+    return false;
+  } finally { 送信中 = false; }
+}
+
+// ---------------- 先生の画面 ----------------
+const 先生の鍵 = (() => { const m = decodeURIComponent(location.hash).match(/先生=([^&]+)/); return m ? m[1] : null; })();
+const 生徒表 = new Map();   // '組/番号' → { 組, 番号, 課題, 時刻, 回路, 判定, 判定の課題, 絵 }
+let 最終取得 = 0, 判定の課題 = '';
+
+function 先生の画面を用意() {
+  const p = document.createElement('div');
+  p.id = 'teacherPanel';
+  p.innerHTML = `
+    <div class="tbar">
+      <h2>先生用一覧</h2>
+      <label>組 <select id="tpKumi"><option value="">すべて</option></select></label>
+      <label>判定 <select id="tpKadai"><option value="">生徒が選んだ課題で</option>
+        ${課題一覧.map(k => `<option>${k.名}</option>`).join('')}<option>${自由課題}</option></select></label>
+      <label><input type="checkbox" id="tpToday" checked> 今日の分だけ</label>
+      <span id="tpCount"></span>
+      <span id="tpTime"></span>
+      <button id="tpNow">今すぐ更新</button>
+    </div>
+    <div id="tpGrid"></div>
+    <div id="tpBig" hidden>
+      <div class="box">
+        <div class="head"><b id="tpBigName"></b><span id="tpBigJudge"></span>
+          <span class="sp"></span><button id="tpOpen" class="green">シミュレータで開く（スイッチを動かせる）</button><button id="tpBigClose">とじる</button></div>
+        <canvas id="tpBigCanvas" width="1100" height="640"></canvas>
+      </div>
+    </div>`;
+  document.body.appendChild(p);
+  const 戻 = document.createElement('button');
+  戻.id = 'tpBack'; 戻.textContent = '← 先生用一覧に戻る'; 戻.hidden = true;
+  戻.onclick = () => { p.hidden = false; 戻.hidden = true; };
+  document.body.appendChild(戻);
+  p.querySelector('#tpKumi').onchange = 一覧を描く;
+  p.querySelector('#tpKadai').onchange = e => { 判定の課題 = e.target.value; 生徒表.forEach(s => { s.判定 = null; }); 一覧を描く(); };
+  p.querySelector('#tpToday').onchange = () => { 生徒表.clear(); 最終取得 = 0; 取りに行く(); };
+  p.querySelector('#tpNow').onclick = () => 取りに行く();
+  p.querySelector('#tpBigClose').onclick = () => { p.querySelector('#tpBig').hidden = true; };
+  取りに行く();
+  setInterval(取りに行く, 一覧の更新間隔);
+  setInterval(() => document.querySelectorAll('#tpGrid .ago').forEach(e => { e.textContent = 何秒前(+e.dataset.t); }), 5000);
+}
+function 何秒前(t) {
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  return s < 60 ? `${s}秒前` : s < 3600 ? `${Math.floor(s / 60)}分前` : new Date(t).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+async function 取りに行く() {
+  const 時 = document.getElementById('tpTime');
+  try {
+    let 以降 = 最終取得;
+    if (!以降 && document.getElementById('tpToday').checked) { const d = new Date(); d.setHours(0, 0, 0, 0); 以降 = d.getTime(); }
+    const j = await 送受信('GET', null, `?key=${encodeURIComponent(先生の鍵)}&since=${以降}`);
+    (j.一覧 || []).forEach(r => {
+      const k = r.組 + '/' + r.番号, 前 = 生徒表.get(k);
+      if (前 && 前.時刻 >= r.時刻) return;
+      生徒表.set(k, { ...r, 判定: null, 絵: null });
+    });
+    // 書きこみと取得がすれちがっても取りこぼさないよう、30 秒ぶん重ねて次を取りに行く（同じものは上で読み飛ばす）
+    最終取得 = Math.max(最終取得, (j.今 || 0) - 30000);
+    時.textContent = '更新 ' + new Date().toLocaleTimeString('ja-JP');
+    時.className = '';
+    一覧を描く();
+  } catch (e) {
+    時.textContent = '取得できません：' + e.message; 時.className = 'err';
+  }
+}
+function 課題をさがす(名) { return 課題一覧.find(k => k.名 === 名) || null; }
+function 一覧を描く() {
+  const 組選 = document.getElementById('tpKumi'), 今の組 = 組選.value;
+  const 組たち = [...new Set([...生徒表.values()].map(s => s.組))].sort();
+  組選.innerHTML = '<option value="">すべて</option>' + 組たち.map(k => `<option${k === 今の組 ? ' selected' : ''}>${文字だけ(k)}</option>`).join('');
+  const 並 = [...生徒表.values()].filter(s => !今の組 || s.組 === 今の組)
+    .sort((a, b) => a.組.localeCompare(b.組) || a.番号 - b.番号);
+  const 格子 = document.getElementById('tpGrid');
+  let 正 = 0, 途 = 0, 他 = 0;
+  格子.innerHTML = '';
+  並.forEach(s => {
+    const 名 = 判定の課題 || s.課題;
+    if (!s.判定 || s.判定の課題 !== 名) {
+      try { s.判定 = 判定する(JSON.parse(s.回路), 課題をさがす(名)); }
+      catch (e) {
+        s.判定 = { 印: '－', 文: /知らない部品/.test(e.message)
+          ? 'このページにない部品があります（記憶の部品なら kioku.html の先生用一覧で）' : '読めない回路' };
+      }
+      s.判定の課題 = 名; s.絵 = null;
+    }
+    if (s.判定.印 === '✓') 正++; else if (s.判定.印 === '△') 途++; else 他++;
+    const 札 = document.createElement('div');
+    札.className = 'card ' + ({ '✓': 'ok', '△': 'part' }[s.判定.印] || 'none');
+    札.innerHTML = `<div class="who"><b>${文字だけ(s.組)} ${文字だけ(s.番号)}番</b><span class="mark">${s.判定.印}</span></div>
+      <div class="kadai">${文字だけ(名)}</div><canvas width="300" height="180"></canvas>
+      <div class="foot"><span class="judge">${文字だけ(s.判定.文)}</span><span class="ago" data-t="${+s.時刻}">${何秒前(+s.時刻)}</span></div>`;
+    const cv2 = 札.querySelector('canvas');
+    if (!s.絵) { try { 回路を描く(cv2, JSON.parse(s.回路), 0.6); s.絵 = cv2.toDataURL(); } catch (e) { } }
+    else { const im = new Image(); im.onload = () => cv2.getContext('2d').drawImage(im, 0, 0); im.src = s.絵; }
+    札.onclick = () => 大きく見る(s);
+    格子.appendChild(札);
+  });
+  document.getElementById('tpCount').textContent = `${並.length}人　✓ ${正}　△ ${途}　－ ${他}`;
+  if (!並.length) 格子.innerHTML = '<p class="empty">まだ届いていません。生徒が［先生に送る］で組・番号・合言葉を入れると、ここに並びます。</p>';
+}
+function 大きく見る(s) {
+  const 窓 = document.getElementById('tpBig');
+  document.getElementById('tpBigName').textContent = `${s.組} ${s.番号}番（${判定の課題 || s.課題}）`;
+  document.getElementById('tpBigJudge').textContent = `${s.判定.印} ${s.判定.文}`;
+  try { 回路を描く(document.getElementById('tpBigCanvas'), JSON.parse(s.回路), 1.2); } catch (e) { }
+  document.getElementById('tpOpen').onclick = () => {
+    loadCircuit(s.回路);
+    窓.hidden = true;
+    document.getElementById('teacherPanel').hidden = true;
+    document.getElementById('tpBack').hidden = false;
+    setStatus(`${s.組} ${s.番号}番 の回路を開きました（先生の画面の中だけ。生徒の回路は変わりません）。`);
+  };
+  窓.hidden = false;
+}
+
+// ---------------- はじめに ----------------
+if (提出先URL) {
+  if (先生の鍵) 先生の画面を用意();
+  else 授業ボタンを用意();
+}
+
+draw();
+</script>
+</body>
+</html>
