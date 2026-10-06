@@ -211,15 +211,15 @@ const statusBar = document.getElementById('status');
 
 const TYPES = {
   IN:   { name: '入力',     w: 64,  h: 40,  ins: [],            outs: [''] },
-  OUT:  { name: '出力',     w: 64,  h: 44,  ins: [''],          outs: [] },
-  AND:  { name: 'AND',      w: 88,  h: 56,  ins: ['', ''],      outs: [''] },
-  OR:   { name: 'OR',       w: 88,  h: 56,  ins: ['', ''],      outs: [''] },
-  NOT:  { name: 'NOT',      w: 80,  h: 44,  ins: [''],          outs: [''] },
-  HALF: { name: '半加算器', w: 116, h: 84,  ins: ['A', 'B'],    outs: ['C', 'S'] },   // 上から C（桁上げ）, S（和）
-  FULL: { name: '全加算器', w: 116, h: 108, ins: ['A', 'B', 'Ci'], outs: ['Co', 'S'] }, // 上から Co（桁上げ）, S（和）
-  SEG:  { name: '７セグ',   w: 108, h: 132, ins: ['1', '2', '4', '8'], outs: [] },
-  SEG4: { name: '７セグ４桁', w: 230, h: 124, ins: ['1', '2', '4', '8'], outs: [] },  // state: 0=2進 1=10進 2=16進
-  SEG4H: { name: '７セグ４桁（上位）', w: 230, h: 124, ins: ['16', '32', '64', '128'], outs: [] },  // SEG4 の上位4ビット版
+  OUT:  { name: '出力',     w: 64,  h: 40,  ins: [''],          outs: [] },
+  AND:  { name: 'AND',      w: 88,  h: 60,  ins: ['', ''],      outs: [''] },
+  OR:   { name: 'OR',       w: 88,  h: 60,  ins: ['', ''],      outs: [''] },
+  NOT:  { name: 'NOT',      w: 80,  h: 40,  ins: [''],          outs: [''] },
+  HALF: { name: '半加算器', w: 116, h: 90,  ins: ['A', 'B'],    outs: ['C', 'S'] },   // 上から C（桁上げ）, S（和）
+  FULL: { name: '全加算器', w: 116, h: 120, ins: ['A', 'B', 'Ci'], outs: ['Co', 'S'] }, // 上から Co（桁上げ）, S（和）
+  SEG:  { name: '７セグ',   w: 108, h: 150, ins: ['1', '2', '4', '8'], outs: [] },
+  SEG4: { name: '７セグ４桁', w: 230, h: 120, inY: [30, 50, 70, 90], ins: ['1', '2', '4', '8'], outs: [] },  // state: 0=2進 1=10進 2=16進
+  SEG4H: { name: '７セグ４桁（上位）', w: 230, h: 120, inY: [30, 50, 70, 90], ins: ['16', '32', '64', '128'], outs: [] },  // SEG4 の上位4ビット版
 };
 
 // 7セグメント点灯パターン (bit: a=1,b=2,c=4,d=8,e=16,f=32,g=64)
@@ -246,7 +246,8 @@ const byId = id => comps.find(c => c.id === id);
 function pinPos(c, kind, i) {
   const t = TYPES[c.type];
   const n = kind === 'in' ? t.ins.length : t.outs.length;
-  return { x: kind === 'in' ? c.x : c.x + t.w, y: c.y + t.h * (i + 1) / (n + 1) };
+  const 決め = kind === 'in' ? t.inY : t.outY;   // 端子の高さ（部品の上から）。格子（10 ごと）に乗せてある
+  return { x: kind === 'in' ? c.x : c.x + t.w, y: c.y + (決め ? 決め[i] : t.h * (i + 1) / (n + 1)) };
 }
 
 function setStatus(msg) { statusBar.textContent = msg; }
