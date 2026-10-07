@@ -936,13 +936,19 @@ function 世界の大きさをそろえる() {
   if (w === 世界の幅 && h === 世界の高さ) return;
   const 枠 = document.getElementById('canvasWrap'), sl = 枠.scrollLeft, st = 枠.scrollTop;
   世界の幅 = w; 世界の高さ = h;
+  if (表示倍率 > 大きさの上限()) { 表示倍率を変える(大きさの上限()); return; }   // 広げた世界が大きすぎる倍率なら下げる
   cv.width = Math.round(w * 表示倍率); cv.height = Math.round(h * 表示倍率);
   枠.scrollLeft = sl; 枠.scrollTop = st;
 }
-const 倍率の段 = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5];
+const 倍率の段 = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5];
 let 表示倍率 = 1;
+// ブラウザのキャンバスは 1 辺 16000 画素・面積 1 億 2 千万画素ほどが上限なので、回路がとても大きいときは上限の倍率を下げる
+function 大きさの上限() {
+  const z = Math.min(倍率の段[倍率の段.length - 1], 16000 / 世界の幅, 16000 / 世界の高さ, Math.sqrt(1.2e8 / (世界の幅 * 世界の高さ)));
+  return Math.max(倍率の段[0], Math.floor(z * 100) / 100);
+}
 function 表示倍率を変える(z, 中心) {
-  z = Math.max(倍率の段[0], Math.min(倍率の段[倍率の段.length - 1], Math.round(z * 100) / 100));
+  z = Math.max(倍率の段[0], Math.min(大きさの上限(), Math.round(z * 100) / 100));
   const 枠 = document.getElementById('canvasWrap');
   // 画面の上で動かさない点（省くと枠のまん中）
   const sx = 中心 ? 中心.sx : 枠.clientWidth / 2, sy = 中心 ? 中心.sy : 枠.clientHeight / 2;
@@ -956,7 +962,8 @@ function 表示倍率を変える(z, 中心) {
 function 一段かえる(向き) {
   const 次 = 向き > 0 ? 倍率の段.find(s => s > 表示倍率 + 0.001) : [...倍率の段].reverse().find(s => s < 表示倍率 - 0.001);
   if (次) 表示倍率を変える(次);
-  setStatus(`表示の大きさ：${Math.round(表示倍率 * 100)}%（回路の大きさは変わりません）`);
+  setStatus(`表示の大きさ：${Math.round(表示倍率 * 100)}%（回路の大きさは変わりません）` +
+    (向き > 0 && 表示倍率 >= 倍率の段[倍率の段.length - 1] - 0.001 ? '。これがいちばん大きい表示です' : ''));
 }
 function 全体を見せる() {
   if (!comps.length) { 表示倍率を変える(1); setStatus('まだ部品がありません。100% にしました。'); return; }
